@@ -35,8 +35,8 @@ LR = 1e-3
 SPLIT_EVERY = 5
 MERGE_EVERY = 10
 SPLIT_THRESHOLD = 1.0
-MERGE_THRESHOLD = 0.5
-ANNEALING_RATE = 1.5
+MERGE_THRESHOLD = 2.0
+ANNEALING_RATE = 2.0
 
 
 def save_figures(results_dir, figures_dir):
@@ -105,25 +105,49 @@ def save_figures(results_dir, figures_dir):
     plt.savefig(figures_dir / "final_bubbles_scatter.png", dpi=150)
     plt.close()
 
-    # 4. クライアントごとの損失曲線
-    final_round_history = bubble_history[-1]["bubbles"]
-    client_to_bubble = {c: bid for bid, clients in final_round_history.items() for c in clients}
+    # 4. バブルごとの平均損失曲線（ラウンドごとのバブル帰属を使用）
+    all_bubble_ids = sorted({bid for h in bubble_history for bid in h["bubbles"]}, key=int)
+    colors = cm.tab20(np.linspace(0, 1, len(all_bubble_ids)))
+    bubble_color = {bid: c for bid, c in zip(all_bubble_ids, colors)}
+
+    bubble_losses = {}
+    for h in bubble_history:
+        r = h["round"]
+        for bid, clients in h["bubbles"].items():
+            ls = [loss_history[c][r - 1] for c in clients if c in loss_history]
+            if ls:
+                bubble_losses.setdefault(bid, {})[r] = sum(ls) / len(ls)
+
     fig, ax = plt.subplots(figsize=(10, 5))
-    colors = cm.tab20(np.linspace(0, 1, len(final_round_history)))
-    bubble_color = {bid: c for bid, c in zip(sorted(final_round_history, key=int), colors)}
-    plotted_labels = set()
-    for cid, losses in loss_history.items():
-        bid = client_to_bubble.get(cid, "?")
-        color = bubble_color.get(bid, "gray")
-        label = f"B{bid}" if bid not in plotted_labels else "_nolegend_"
-        plotted_labels.add(bid)
-        ax.plot(range(1, len(losses) + 1), losses, color=color, alpha=0.4, linewidth=0.8, label=label)
+    for bid in all_bubble_ids:
+        if bid not in bubble_losses:
+            continue
+        rs = sorted(bubble_losses[bid])
+        ls = [bubble_losses[bid][r] for r in rs]
+        ax.plot(rs, ls, color=bubble_color[bid], linewidth=1.5,
+                marker="o", markersize=3, label=f"B{bid}")
     ax.set_xlabel("Round")
-    ax.set_ylabel("Loss")
-    ax.set_title("Per-client loss curves (colored by final bubble)")
+    ax.set_ylabel("Mean loss")
+    ax.set_title("Per-bubble mean loss curves")
     ax.legend(loc="upper right", fontsize=7, ncol=4)
     plt.tight_layout()
-    plt.savefig(figures_dir / "client_losses.png", dpi=150)
+    plt.savefig(figures_dir / "bubble_losses.png", dpi=150)
+    plt.close()
+
+    # 5. バブルごとの W2² 推移
+    all_w2_bids = sorted({bid for h in bubble_history for bid in h.get("intra_w2", {})}, key=int)
+    colors_w2 = cm.tab20(np.linspace(0, 1, len(all_w2_bids)))
+    fig, ax = plt.subplots(figsize=(10, 5))
+    for bid, color in zip(all_w2_bids, colors_w2):
+        rs = [h["round"] for h in bubble_history if bid in h.get("intra_w2", {})]
+        vs = [h["intra_w2"][bid] for h in bubble_history if bid in h.get("intra_w2", {})]
+        ax.plot(rs, vs, color=color, linewidth=1.5, marker="o", markersize=3, label=f"B{bid}")
+    ax.set_xlabel("Round")
+    ax.set_ylabel("Intra-bubble W2²")
+    ax.set_title("Intra-bubble W2² per round (per bubble)")
+    ax.legend(loc="upper right", fontsize=7, ncol=4)
+    plt.tight_layout()
+    plt.savefig(figures_dir / "intra_w2.png", dpi=150)
     plt.close()
 
     print(f"  figures → {figures_dir}")
@@ -234,10 +258,12 @@ def run(subject_datasets, client_ids, label_stats, results_dir,
                 if verbose:
                     print(f"  [Merge] {before} → {after} bubbles")
 
+        intra_w2 = server.intra_w2_per_bubble(all_stats)
         bubble_history.append({
             "round": round_idx + 1,
             "bubbles": {str(bid): sorted(b["clients"]) for bid, b in server.bubbles.items()},
             "mean_loss": round_mean_loss,
+            "intra_w2": {str(bid): v for bid, v in intra_w2.items()},
         })
 
     # 予測

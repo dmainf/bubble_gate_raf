@@ -41,6 +41,24 @@ class BubbleManager:
             new_state[name] = state[name].to(avg_delta.device) + avg_delta
         self.bubbles[bubble_id]["state"] = new_state
 
+    def intra_w2_per_bubble(self, client_stats):
+        """バブルごとのバブル内ペア W2² 平均を返す: {bid: float}"""
+        result = {}
+        for bid, bubble in self.bubbles.items():
+            clients = [c for c in bubble["clients"] if c in client_stats]
+            if len(clients) < 2:
+                result[bid] = 0.0
+                continue
+            mus  = torch.stack([client_stats[c][0] for c in clients])
+            sigs = torch.stack([client_stats[c][1] for c in clients])
+            mu_diff  = mus.unsqueeze(1)  - mus.unsqueeze(0)
+            sig_diff = sigs.unsqueeze(1) - sigs.unsqueeze(0)
+            w2_sq = (mu_diff ** 2).sum(dim=2) + (sig_diff ** 2).sum(dim=2)
+            n = len(clients)
+            triu = w2_sq.triu(diagonal=1)
+            result[bid] = float((triu.sum() / (n * (n - 1) / 2)).item())
+        return result
+
     @staticmethod
     def _w2_sq(mu_a, sig_a, mu_b, sig_b):
         """2-Wasserstein 距離の二乗（ガウス近似）"""
