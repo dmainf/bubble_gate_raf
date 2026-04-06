@@ -16,7 +16,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 from train import prepare_data, run, get_device
 
-SPLIT_THRESHOLDS = [0.5, 1.0, 1.5, 2.0, 2.5, 3.0]
+SPLIT_THRESHOLDS = [1.0, 1.5, 2.0, 2.5, 3.0]
 MERGE_THRESHOLD = 2.0
 ANNEALING_RATE = 2.0
 
@@ -31,6 +31,7 @@ def main():
     colors = cm.tab10(np.linspace(0, 1, len(SPLIT_THRESHOLDS)))
     fig_loss, ax_loss = plt.subplots(figsize=(10, 5))
     fig_w2,   ax_w2   = plt.subplots(figsize=(10, 5))
+    fig_nb,   ax_nb   = plt.subplots(figsize=(10, 5))
 
     for st, color in zip(SPLIT_THRESHOLDS, colors):
         print(f"\n--- split_threshold={st} ---")
@@ -58,6 +59,10 @@ def main():
         ax_w2.plot(rounds, mean_w2s, color=color, linewidth=1.5,
                    marker="o", markersize=3, label=f"split={st}")
 
+        n_bubbles = [len(h["bubbles"]) for h in bubble_history]
+        ax_nb.step(rounds, n_bubbles, color=color, where="post", linewidth=1.5,
+                   marker="o", markersize=3, label=f"split={st}")
+
     out_dir = Path(__file__).parent / "sweep"
     out_dir.mkdir(exist_ok=True)
 
@@ -66,7 +71,7 @@ def main():
     ax_loss.set_title("Mean loss per round (sweep over split_threshold)")
     ax_loss.legend(loc="upper right", fontsize=9)
     fig_loss.tight_layout()
-    fig_loss.savefig(out_dir / "sweep_split_loss.png", dpi=150)
+    fig_loss.savefig(out_dir / "SPLIT_loss.png", dpi=150)
     plt.close(fig_loss)
 
     ax_w2.set_xlabel("Round")
@@ -74,8 +79,16 @@ def main():
     ax_w2.set_title("Mean intra-bubble W2² per round (sweep over split_threshold)")
     ax_w2.legend(loc="upper right", fontsize=9)
     fig_w2.tight_layout()
-    fig_w2.savefig(out_dir / "sweep_split_w2.png", dpi=150)
+    fig_w2.savefig(out_dir / "SPLIT_w2.png", dpi=150)
     plt.close(fig_w2)
+
+    ax_nb.set_xlabel("Round")
+    ax_nb.set_ylabel("Number of bubbles")
+    ax_nb.set_title("Number of bubbles per round (sweep over split_threshold)")
+    ax_nb.legend(loc="upper right", fontsize=9)
+    fig_nb.tight_layout()
+    fig_nb.savefig(out_dir / "SPLIT_nb.png", dpi=150)
+    plt.close(fig_nb)
 
     print(f"\nDone. Figures saved to {out_dir}")
 
