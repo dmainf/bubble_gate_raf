@@ -1,29 +1,30 @@
 """
-バブル型クラスタ学習（対照学習版）メインループ
+バブル型クラスタ連合学習（CFL）メインループ
 
-事前に precompute.py を実行して SwiFT 潜在ベクトルをキャッシュしておくこと．
+事前にprecompute.pyを実行してSwiFT潜在ベクトルをキャッシュしておくこと．
 
-アーキテクチャ:
-  全被験者の z → encoder → h（サーバーが直接観測）
-  ℒ = ℒ_MSE(acc, RT) + λ · ℒ_InfoNCE(h vs バブルプロトタイプ)
-  バブル割り当ては h 空間の最近傍プロトタイプで更新する．
+アーキテクチャ（research_plan.txt セクション3参照）:
+  クライアント: キャッシュ済み潜在ベクトル → ClientModel → Δw → サーバーへ送信
+  サーバー: 勾配のコサイン類似度でバブルを管理 → バブル内FedAvg → モデルをクライアントへ返す
 """
 
 import sys
 import json
 import torch
-import torch.nn as nn
 import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 import numpy as np
 from pathlib import Path
+from torch.utils.data import DataLoader
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 sys.stdout.reconfigure(line_buffering=True)
 sys.path.insert(0, str(Path(__file__).parent))
 
 from dataset import HCPWMLatentDataset, compute_label_stats
 from client_model import ClientModel
+from client import Client
 from bubble_manager import BubbleManager
 
 
@@ -31,79 +32,22 @@ DATA_DIR = Path(__file__).parent / "data"
 N_ROUNDS = 30
 LOCAL_EPOCHS = 2
 LR = 1e-3
-LAMBDA_CON = 0.5
-TEMPERATURE = 0.1
 SPLIT_EVERY = 5
 MERGE_EVERY = 10
-REASSIGN_EVERY = 3
-SPLIT_THRESHOLD = 0.3
-MERGE_THRESHOLD = 0.05
+SPLIT_THRESHOLD = 1.0
+MERGE_THRESHOLD = 2.0
+ANNEALING_RATE = 2.0
 
 
-def get_subject_ids():
-    return sorted([d.name for d in DATA_DIR.iterdir() if d.is_dir() and d.name != "latent_cache"])
-
-
-def get_device():
-    if torch.backends.mps.is_available():
-        return torch.device("mps")
-    if torch.cuda.is_available():
-        return torch.device("cuda")
-    return torch.device("cpu")
-
-
-def prepare_data(device):
-    subject_ids = get_subject_ids()
-    n_train = int(len(subject_ids) * 0.8)
-    label_stats = compute_label_stats(subject_ids[:n_train])
-
-    subject_datasets = {}
-    for sub in subject_ids:
-        ds = HCPWMLatentDataset([sub], label_stats=label_stats)
-        if len(ds) > 0:
-            subject_datasets[sub] = ds
-
-    client_ids = list(subject_datasets.keys())
-    return subject_ids, label_stats, subject_datasets, client_ids
-
-
-def load_all_tensors(subject_datasets, device):
-    """全被験者の (z, labels) テンソルをデバイスに展開"""
-    data = {}
-    for sid, ds in subject_datasets.items():
-        z_list, acc_list, rt_list = [], [], []
-        for sample in ds:
-            z_list.append(sample["z"])
-            acc_list.append(sample["acc_2bk"])
-            rt_list.append(sample["rt_2bk"])
-        data[sid] = {
-            "z": torch.stack(z_list).to(device),
-            "labels": torch.stack([torch.stack(acc_list), torch.stack(rt_list)], dim=1).to(device),
-        }
-    return data
-
-
-@torch.no_grad()
-def compute_h_subject(model, all_data):
-    """全被験者の h ベクトル（ウィンドウ平均）を返す: {sid: tensor(128,)}"""
-    model.eval()
-    result = {}
-    for sid, d in all_data.items():
-        h = model.encode(d["z"])
-        result[sid] = h.mean(0)
-    model.train()
-    return result
-
-
-def save_figures(data_dir, figures_dir):
+def save_figures(results_dir, figures_dir):
     figures_dir = Path(figures_dir)
     figures_dir.mkdir(exist_ok=True)
 
-    with open(data_dir / "bubble_history.json") as f:
+    with open(results_dir / "bubble_history.json") as f:
         bubble_history = json.load(f)
-    with open(data_dir / "loss_history.json") as f:
+    with open(results_dir / "loss_history.json") as f:
         loss_history = json.load(f)
-    with open(data_dir / "final_bubbles.json") as f:
+    with open(results_dir / "final_bubbles.json") as f:
         final_bubbles = json.load(f)
 
     rounds = [h["round"] for h in bubble_history]
@@ -145,7 +89,7 @@ def save_figures(data_dir, figures_dir):
     plt.savefig(figures_dir / "bubble_sizes.png", dpi=150)
     plt.close()
 
-    # 3. 最終バブルの acc vs RT 散布図
+    # 3. 最終バブルのacc vs RT散布図
     fig, ax = plt.subplots(figsize=(7, 6))
     colors = cm.tab20(np.linspace(0, 1, len(final_bubbles)))
     for (bid, members), color in zip(final_bubbles.items(), colors):
@@ -161,7 +105,7 @@ def save_figures(data_dir, figures_dir):
     plt.savefig(figures_dir / "final_bubbles_scatter.png", dpi=150)
     plt.close()
 
-    # 4. バブルごとの平均損失曲線
+    # 4. バブルごとの平均損失曲線（ラウンドごとのバブル帰属を使用）
     all_bubble_ids = sorted({bid for h in bubble_history for bid in h["bubbles"]}, key=int)
     colors = cm.tab20(np.linspace(0, 1, len(all_bubble_ids)))
     bubble_color = {bid: c for bid, c in zip(all_bubble_ids, colors)}
@@ -190,50 +134,76 @@ def save_figures(data_dir, figures_dir):
     plt.savefig(figures_dir / "bubble_losses.png", dpi=150)
     plt.close()
 
-    # 5. バブルごとのコサイン距離（intra_dist）推移
-    all_dist_bids = sorted({bid for h in bubble_history for bid in h.get("intra_dist", {})}, key=int)
-    colors_d = cm.tab20(np.linspace(0, 1, len(all_dist_bids)))
+    # 5. バブルごとの W2² 推移
+    all_w2_bids = sorted({bid for h in bubble_history for bid in h.get("intra_w2", {})}, key=int)
+    colors_w2 = cm.tab20(np.linspace(0, 1, len(all_w2_bids)))
     fig, ax = plt.subplots(figsize=(10, 5))
-    for bid, color in zip(all_dist_bids, colors_d):
-        rs = [h["round"] for h in bubble_history if bid in h.get("intra_dist", {})]
-        vs = [h["intra_dist"][bid] for h in bubble_history if bid in h.get("intra_dist", {})]
+    for bid, color in zip(all_w2_bids, colors_w2):
+        rs = [h["round"] for h in bubble_history if bid in h.get("intra_w2", {})]
+        vs = [h["intra_w2"][bid] for h in bubble_history if bid in h.get("intra_w2", {})]
         ax.plot(rs, vs, color=color, linewidth=1.5, marker="o", markersize=3, label=f"B{bid}")
     ax.set_xlabel("Round")
-    ax.set_ylabel("Intra-bubble cosine distance")
-    ax.set_title("Intra-bubble cosine distance per round")
+    ax.set_ylabel("Intra-bubble W2²")
+    ax.set_title("Intra-bubble W2² per round (per bubble)")
     ax.legend(loc="upper right", fontsize=7, ncol=4)
     plt.tight_layout()
-    plt.savefig(figures_dir / "intra_dist.png", dpi=150)
+    plt.savefig(figures_dir / "intra_w2.png", dpi=150)
     plt.close()
 
     print(f"  figures → {figures_dir}")
 
 
+def get_subject_ids():
+    return sorted([d.name for d in DATA_DIR.iterdir() if d.is_dir() and d.name != "latent_cache"])
+
+
+def get_device():
+    if torch.backends.mps.is_available():
+        return torch.device("mps")
+    if torch.cuda.is_available():
+        return torch.device("cuda")
+    return torch.device("cpu")
+
+
+def prepare_data(device):
+    """データセットの準備（sweep.pyと共有）"""
+    subject_ids = get_subject_ids()
+    n_train = int(len(subject_ids) * 0.8)
+    label_stats = compute_label_stats(subject_ids[:n_train])
+
+    subject_datasets = {}
+    for sub in subject_ids:
+        ds = HCPWMLatentDataset([sub], label_stats=label_stats)
+        if len(ds) > 0:
+            subject_datasets[sub] = ds
+
+    client_ids = list(subject_datasets.keys())
+    return subject_ids, label_stats, subject_datasets, client_ids
+
+
 def run(subject_datasets, client_ids, label_stats, results_dir,
         split_threshold=SPLIT_THRESHOLD, merge_threshold=MERGE_THRESHOLD,
-        lambda_con=LAMBDA_CON, temperature=TEMPERATURE,
+        annealing_rate=ANNEALING_RATE,
         n_rounds=N_ROUNDS, local_epochs=LOCAL_EPOCHS, lr=LR,
         verbose=True):
     """
-    対照学習付きバブル型クラスタ学習の1実験を実行して結果を保存する．
+    CFLの1実験を実行して結果を保存する．
+    sweep.pyからも呼ばれる．
 
     Returns:
-        dict: {n_final_bubbles, final_loss, n_splits, n_merges}
+        dict: {n_final_bubbles, final_loss, n_merges, n_splits}
     """
     results_dir = Path(results_dir)
     results_dir.mkdir(parents=True, exist_ok=True)
     device = get_device()
 
-    all_data = load_all_tensors(subject_datasets, device)
-    model = ClientModel().to(device)
-    optimizer = torch.optim.Adam(model.parameters(), lr=lr)
-    criterion = nn.MSELoss()
-
-    server = BubbleManager(client_ids,
+    initial_state = {k: v.clone() for k, v in ClientModel().state_dict().items()}
+    server = BubbleManager(client_ids, initial_state,
                            split_threshold=split_threshold,
                            merge_threshold=merge_threshold)
+    clients = {sub: Client(sub, subject_datasets[sub], device=device) for sub in client_ids}
 
-    loss_history = {sid: [] for sid in client_ids}
+    loss_history = {}
     bubble_history = []
     n_splits, n_merges = 0, 0
 
@@ -242,103 +212,94 @@ def run(subject_datasets, client_ids, label_stats, results_dir,
             print(f"\n=== Round {round_idx + 1}/{n_rounds} ===")
             print(f"  Bubbles: {server.bubble_summary()}")
 
-        # ラウンド先頭でプロトタイプを凍結（frozen keys）
-        h_subject_frozen = compute_h_subject(model, all_data)
-        prototypes = server.get_prototypes(h_subject_frozen)
+        model_states = {cid: server.get_model_state(cid) for cid in client_ids}
+        all_updates, all_stats = {}, {}
 
-        model.train()
-        for epoch in range(local_epochs):
-            # 全被験者のh を勾配ありで計算
-            h_batch = {}
-            task_losses = []
-            for sid in client_ids:
-                z = all_data[sid]["z"]
-                h = model.encode(z)                # (N_win, 128)  grad あり
-                pred = model.head(h)               # (N_win, 2)
-                task_losses.append(criterion(pred, all_data[sid]["labels"]))
-                h_batch[sid] = h.mean(0)           # (128,)        grad あり
+        with ThreadPoolExecutor() as executor:
+            futures = {
+                executor.submit(clients[cid].local_train, model_states[cid], local_epochs, lr): cid
+                for cid in client_ids
+            }
+            for i, future in enumerate(as_completed(futures)):
+                cid = futures[future]
+                updates, stats, loss = future.result()
+                all_updates[cid] = updates
+                all_stats[cid] = stats
+                loss_history.setdefault(cid, []).append(loss)
+                if verbose:
+                    print(f"  [{i+1}/{len(client_ids)}] {cid} loss={loss:.4f}")
 
-            task_loss = torch.stack(task_losses).mean()
-            con_loss = server.infonce_loss(h_batch, prototypes, temperature=temperature)
-
-            loss = task_loss + lambda_con * con_loss
-            optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
-
-        # 評価（no_grad）
-        model.eval()
-        with torch.no_grad():
-            for sid in client_ids:
-                h = model.encode(all_data[sid]["z"])
-                loss_val = criterion(model.head(h), all_data[sid]["labels"]).item()
-                loss_history[sid].append(loss_val)
-
-        round_mean_loss = sum(loss_history[sid][-1] for sid in client_ids) / len(client_ids)
+        round_mean_loss = sum(loss_history[c][-1] for c in client_ids) / len(client_ids)
         if verbose:
-            print(f"  task_loss={task_loss.item():.4f}  con_loss={con_loss.item() if hasattr(con_loss, 'item') else con_loss:.4f}  eval_loss={round_mean_loss:.4f}")
+            print(f"  --> Mean loss: {round_mean_loss:.4f}")
 
-        # h を更新してバブル管理
-        h_subject = compute_h_subject(model, all_data)
-        intra_dist = server.intra_dist_per_bubble(h_subject)
-
-        if (round_idx + 1) % REASSIGN_EVERY == 0:
-            server.reassign(h_subject)
-            if verbose:
-                print(f"  [Reassign] {server.bubble_summary()}")
+        for bubble_id, bubble in server.bubbles.items():
+            bubble_updates = {c: all_updates[c] for c in bubble["clients"] if c in all_updates}
+            if bubble_updates:
+                server.fedavg(bubble_id, bubble_updates)
 
         if (round_idx + 1) % SPLIT_EVERY == 0:
             before = server.n_bubbles
-            server.split_bubbles(h_subject)
+            if round_idx > 0:
+                server.split_threshold *= annealing_rate
+            server.split_bubbles(all_stats)
             after = server.n_bubbles
             if after > before:
                 n_splits += after - before
             if verbose:
-                print(f"  [Split] {before} → {after} bubbles (threshold={split_threshold:.3f})")
+                print(f"  [Split] threshold={server.split_threshold:.3f}, {before} → {after} bubbles")
 
         if (round_idx + 1) % MERGE_EVERY == 0:
             before = server.n_bubbles
-            server.merge_bubbles(h_subject)
+            server.merge_bubbles(all_stats)
             after = server.n_bubbles
             if after < before:
                 n_merges += before - after
-            if verbose:
-                print(f"  [Merge] {before} → {after} bubbles")
+                if verbose:
+                    print(f"  [Merge] {before} → {after} bubbles")
 
+        intra_w2 = server.intra_w2_per_bubble(all_stats)
         bubble_history.append({
             "round": round_idx + 1,
-            "bubbles": {str(bid): sorted(clients) for bid, clients in server.bubbles.items()},
+            "bubbles": {str(bid): sorted(b["clients"]) for bid, b in server.bubbles.items()},
             "mean_loss": round_mean_loss,
-            "intra_dist": {str(bid): v for bid, v in intra_dist.items()},
+            "intra_w2": {str(bid): v for bid, v in intra_w2.items()},
         })
 
     # 予測
-    model.eval()
     predictions = []
-    with torch.no_grad():
-        for sid in client_ids:
-            h = model.encode(all_data[sid]["z"])
-            pred = model.head(h).cpu()
-            for i in range(pred.shape[0]):
-                predictions.append({
-                    "subject": sid,
-                    "bubble": server.client_to_bubble[sid],
-                    "pred_acc": float(pred[i, 0] * label_stats["acc_std"] + label_stats["acc_mean"]),
-                    "pred_rt":  float(pred[i, 1] * label_stats["rt_std"]  + label_stats["rt_mean"]),
-                    "true_acc": float(all_data[sid]["labels"][i, 0] * label_stats["acc_std"] + label_stats["acc_mean"]),
-                    "true_rt":  float(all_data[sid]["labels"][i, 1] * label_stats["rt_std"]  + label_stats["rt_mean"]),
-                })
+    for cid in client_ids:
+        model_state = server.get_model_state(cid)
+        model = ClientModel()
+        model.load_state_dict({k: v.to(device) for k, v in model_state.items()})
+        model = model.to(device)
+        model.eval()
+        loader = DataLoader(subject_datasets[cid], batch_size=8, shuffle=False)
+        with torch.no_grad():
+            for batch in loader:
+                z = batch["z"].to(device)
+                pred = model(z).cpu()
+                for i in range(pred.shape[0]):
+                    predictions.append({
+                        "subject": cid,
+                        "bubble": server.client_to_bubble[cid],
+                        "window_idx": int(batch["window_idx"][i]),
+                        "pred_acc": float(pred[i, 0] * label_stats["acc_std"] + label_stats["acc_mean"]),
+                        "pred_rt":  float(pred[i, 1] * label_stats["rt_std"]  + label_stats["rt_mean"]),
+                        "true_acc": float(batch["acc_2bk"][i] * label_stats["acc_std"] + label_stats["acc_mean"]),
+                        "true_rt":  float(batch["rt_2bk"][i]  * label_stats["rt_std"]  + label_stats["rt_mean"]),
+                    })
 
     # 最終バブルの行動成績
     final_bubbles = {}
-    for bid, clients in server.bubbles.items():
+    for bid, bubble in server.bubbles.items():
         members = []
-        for cid in sorted(clients):
+        for cid in sorted(bubble["clients"]):
             path = DATA_DIR / cid / "MNINonLinear" / "Results" / "tfMRI_WM_LR" / "EVs" / "WM_Stats.csv"
             if path.exists():
                 df = pd.read_csv(path)
                 acc = df[(df["ConditionName"].str.startswith("2BK")) & (df["Measure"] == "ACC")]["Value"].mean()
-                rt  = df[(df["ConditionName"].str.startswith("2BK")) & (df["Measure"] == "MEDIAN_RT")]["Value"].mean()
+                rt = df[(df["ConditionName"].str.startswith("2BK")) & (df["Measure"] == "MEDIAN_RT")]["Value"].mean()
                 members.append({"subject": cid,
                                  "acc_2bk": float(acc) if acc == acc else None,
                                  "rt_2bk":  float(rt)  if rt  == rt  else None})
@@ -346,6 +307,7 @@ def run(subject_datasets, client_ids, label_stats, results_dir,
                 members.append({"subject": cid, "acc_2bk": None, "rt_2bk": None})
         final_bubbles[str(bid)] = members
 
+    # 保存: JSON・ptはdata/サブディレクトリへ、グラフはresults_dir直下へ
     data_dir = results_dir / "data"
     data_dir.mkdir(exist_ok=True)
 
@@ -357,13 +319,14 @@ def run(subject_datasets, client_ids, label_stats, results_dir,
         json.dump(final_bubbles, f, indent=2)
     with open(data_dir / "predictions.json", "w") as f:
         json.dump(predictions, f, indent=2)
-    torch.save(model.state_dict(), data_dir / "model.pt")
+    for bid, bubble in server.bubbles.items():
+        torch.save(bubble["state"], data_dir / f"bubble_{bid}.pt")
 
     save_figures(data_dir, results_dir)
 
     if verbose:
         print(f"\n=== Training complete ===")
-        print(f"Final bubbles: {server.bubble_summary()}")
+        print(f"Final bubble configuration: {server.bubble_summary()}")
         for bid, members in final_bubbles.items():
             accs = [m["acc_2bk"] for m in members if m["acc_2bk"] is not None]
             rts  = [m["rt_2bk"]  for m in members if m["rt_2bk"]  is not None]

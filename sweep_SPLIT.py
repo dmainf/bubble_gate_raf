@@ -16,9 +16,8 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 from train import prepare_data, run, get_device
 
-SPLIT_THRESHOLDS = [1.0, 1.5, 2.0, 2.5, 3.0]
-MERGE_THRESHOLD = 2.0
-ANNEALING_RATE = 2.0
+SPLIT_THRESHOLDS = [0.1, 0.2, 0.3, 0.4, 0.5]
+MERGE_THRESHOLD = 0.05
 
 
 def main():
@@ -41,7 +40,6 @@ def main():
                 results_dir=tmpdir,
                 split_threshold=st,
                 merge_threshold=MERGE_THRESHOLD,
-                annealing_rate=ANNEALING_RATE,
                 verbose=False,
             )
             with open(Path(tmpdir) / "data" / "bubble_history.json") as f:
@@ -53,7 +51,7 @@ def main():
                      marker="o", markersize=3, label=f"split={st}")
 
         mean_w2s = [
-            np.mean(list(h["intra_w2"].values())) if h.get("intra_w2") else 0.0
+            np.mean(list(h["intra_dist"].values())) if h.get("intra_dist") else 0.0
             for h in bubble_history
         ]
         ax_w2.plot(rounds, mean_w2s, color=color, linewidth=1.5,
@@ -75,8 +73,8 @@ def main():
     plt.close(fig_loss)
 
     ax_w2.set_xlabel("Round")
-    ax_w2.set_ylabel("Mean intra-bubble W2²")
-    ax_w2.set_title("Mean intra-bubble W2² per round (sweep over split_threshold)")
+    ax_w2.set_ylabel("Mean intra-bubble cosine distance")
+    ax_w2.set_title("Mean intra-bubble cosine distance per round (sweep over split_threshold)")
     ax_w2.legend(loc="upper right", fontsize=9)
     fig_w2.tight_layout()
     fig_w2.savefig(out_dir / "SPLIT_w2.png", dpi=150)
