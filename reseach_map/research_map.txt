@@ -1,0 +1,451 @@
+　研究計画：バブル型クラスタ学習によるGateRAF強化と脳fMRIタスク予測
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+0. なぜGateRAFか
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+タスク実行中の脳fMRI時系列データは以下の3つの性質を持ち，通常の予測モデルでは対処が難しい．
+
+【系列の多さ】
+  - fMRIデータはROI×被験者の組み合わせで膨大な数の時系列が存在する
+  - 単一被験者・単一ROIのデータ量は限られていても，系列の総数は多い
+  - → 他の被験者・ROIの系列を参照することで情報不足を補える
+  - RAFはこの「横断的な参照」を可能にするアーキテクチャである
+
+【スパイク】
+  - タスク中の神経応答はBOLD信号として現れ，刺激提示タイミングに同期した
+    スパイク状の一過性の活動が平常期の中に点在する
+  - 予測モデルは誤差全体を最小化しようとするため，頻度の低いスパイクを無視しがち
+  - スパイクそのものを予測するよりも，スパイク直前の予兆（トリガー）を
+    他被験者の類似タスク事例から参照することで補完できる
+  - → RAFの参照機構がスパイク予測に有効
+
+【スパース】
+  - タスク中に活動する脳領域は全ROIのごく一部であり，時系列はスパース
+  - スパースな系列では時系列モデルが学習できる特徴量が少ない
+  - → 似た脳ネットワーク特性を持つ被験者の隠れ状態を参照して補完できる
+
+【シンプルなRAFでは不十分な理由】
+  - 似ていない系列を強制的に参照してしまう → ノイズになる
+  - 異なる被験者の時系列を結合すると時系列が不連続になる
+  - → Gateで不適切な参照を棄却し，Multi-Streamで系列を分離するGateRAFが必要
+
+【脳データ固有の追加課題】
+  - fMRI時系列は個人差が激しく，同じタスクでも被験者間で活動パターンが異なる
+  - 個人差によってベクトル空間の基準がずれ，参照がさらに機能しにくい
+  - → バブル型クラスタ学習で空間を整地することが不可欠
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+1. 研究の核心：2段階設計
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+「空間を整えながら，同時に他者を参照する」という不安定なことはしない．
+
+  Phase 1（空間整地）  →  Phase 2（参照学習）
+  ────────────────────────────────────────────
+  自力でタスクを解きながら    整った空間と固定バブルを
+  h 空間をバブル構造に整地    使って，安全に他者を参照
+
+
+【2段階が必須な理由：Moving Target問題】
+  Phase 1 ではラウンドごとに Split/Merge が発生し，バブルメンバーが変動する．
+  この状態で Gate 層を同時に学習させると，検索対象（入力分布）が常に変化するため
+  Gate 層は「いつ開くか」のルールを学習できず，重みが収束しない．
+  → Phase 1 でバブルを完全に固定してから，Phase 2 で Gate を学習するという分業が不可欠．
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+2. Phase 1：バブル形成（実装済み）
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+【目標】
+  被験者の生理的・認知的特性に基づくバブル（クラスタ）を形成し，
+  似た者同士が同じバブルに集まった「安全で整頓された $h$ 空間」を構築する．
+
+【モデル構成】
+
+  $\mathbf{z} \in \mathbb{R}^{288}$  （SwiFT 凍結エンコーダの出力）
+      ↓
+  encoder 層（学習） → $\mathbf{h} \in \mathbb{R}^{128}$
+      ↓
+  予測ヘッド（学習） → $[\hat{y}_{\text{acc}},\, \hat{y}_{\text{rt}}]$
+
+  $\text{encoder} = \mathrm{Linear}(288 \to 128) \to \mathrm{LayerNorm} \to \mathrm{ReLU}$
+
+【ファイル構成】
+
+  precompute.py    SwiFT に全被験者の fMRI を通し，$\mathbf{z}$ を data/ にキャッシュ
+  dataset.py       キャッシュ済み $\mathbf{z}$ と行動ラベル（acc/RT）の読み込み
+  client_model.py  encoder + 予測ヘッドの定義（ClientModel）
+  bubble_manager.py バブル管理：プロトタイプ・InfoNCE 損失・Reassign・Split・Merge
+  train.py         メインループ（60ラウンド）．結果を results/ に保存
+
+【1ラウンドの処理フロー】
+
+  ① ラウンド先頭でプロトタイプを凍結（frozen keys）
+
+       $\mathbf{h}_i^{\text{frozen}} = \mathrm{mean}_t\bigl[\mathrm{encoder}(\mathbf{z}_i^{(t)})\bigr]$
+           （no\_grad，全被験者）
+
+       $\mathbf{c}_B = \frac{1}{|B|} \sum_{i \in B} \mathbf{h}_i^{\text{frozen}}$
+           （バブルごとの代表点）
+
+  ② LOCAL\_EPOCHS 回，全被験者を一括で学習
+
+       $\mathbf{h}_i = \mathrm{encoder}(\mathbf{z}_i)$   （grad あり，queries）
+
+       $\hat{\mathbf{y}}_i = \mathrm{head}(\mathbf{h}_i)$
+
+       $\mathcal{L}_{\text{task}} = \frac{1}{N} \sum_i \mathrm{MSE}(\hat{\mathbf{y}}_i,\, \mathbf{y}_i)$
+
+       $\mathcal{L}_{\text{con}} = \frac{1}{N} \sum_i \left[
+           -\log \frac{\exp\bigl(\mathrm{sim}(\mathbf{h}_i,\, \mathbf{c}_{B_i}) / \tau\bigr)}
+                      {\sum_{B'} \exp\bigl(\mathrm{sim}(\mathbf{h}_i,\, \mathbf{c}_{B'}) / \tau\bigr)}
+       \right]$
+
+       $\mathcal{L} = \mathcal{L}_{\text{task}} + \lambda \cdot \mathcal{L}_{\text{con}}$
+           → backward → Adam
+
+  ③ 評価（no\_grad，全被験者）
+       各被験者の eval\_loss を記録
+
+  ④ バブル管理（スケジュールに従って実行）
+       毎 3 ラウンド：Reassign（最近傍プロトタイプへ再割り当て）
+       毎 5 ラウンド：Split（split\_threshold を超えたバブルを2分割）
+       毎 10 ラウンド：Merge（近接バブルを統合）
+
+【バブル更新：コサイン距離に基づく操作】
+
+  コサイン距離：$d(\mathbf{a}, \mathbf{b}) = 1 - \cos(\mathbf{a}, \mathbf{b}) \in [0,\, 2]$
+
+  Reassign：各被験者を最近傍プロトタイプのバブルへ移動
+    $B_i \leftarrow \operatorname{argmin}_{B}\, d(\mathbf{h}_i,\, \mathbf{c}_B)$
+
+  Split：バブル内最大コサイン距離が $\theta_{\text{split}}$ を超えたら2分割
+    - 最遠ペア $(i^*, j^*)$ を見つけ，各被験者を近い方へ割り振る
+    - 分割のたびに $\theta_{\text{split}} \leftarrow \theta_{\text{split}} \times r_{\text{anneal}}$（過分割を抑制）
+
+  Merge：バブル間プロトタイプのコサイン距離が $\theta_{\text{merge}}$ 以下なら統合
+    $d(\mathbf{c}_A,\, \mathbf{c}_B) < \theta_{\text{merge}} \Rightarrow B \text{ を } A \text{ に吸収}$
+
+【Phase 1 の出力】
+  results/data/model.pt           学習済み encoder + head の重み
+  results/data/final_bubbles.json 最終バブル構成 $\{b : [i_1, i_2, \ldots]\}$
+  results/data/bubble_history.json ラウンドごとのバブル推移ログ
+
+【Phase 1 では「参照」をしていない】
+  このフェーズでは他者のデータを検索・参照する機能（Retrieval）は一切ない．
+  モデルは自分自身の $\mathbf{z}$ だけを使って自力でタスクを予測しながら $h$ 空間を整地する．
+  誰も他者のデータを参照していないため，空間が整っていない初期状態でも学習が崩壊しない．
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+3. Phase 2：GateRAF（実装予定）
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+【前提】
+  Phase 1 の 60 ラウンドが完了し，model.pt と final\_bubbles.json をロードして開始する．
+  GateRAF が初めて他者の情報を参照するその瞬間には，すでに
+  「似た者同士が同じバブルに集まった，安全で整頓された空間」が約束されている．
+
+【新しいモデル構成】
+
+  $\mathbf{z} \in \mathbb{R}^{288}$  （SwiFT 凍結エンコーダの出力）
+      ↓
+  encoder（Phase 1 の重みをロード，Freeze or Fine-tune） → $\mathbf{h}_q \in \mathbb{R}^{128}$
+      ↓
+  Memory Bank 検索（同一バブル内の他者の $\mathbf{h}$ を取得） → $\mathbf{h}_{\text{ret}} \in \mathbb{R}^{128}$
+      ↓
+  Gate 層（MLP or Attention）
+      入力: $[\mathbf{h}_q;\, \mathbf{h}_{\text{ret}}]$
+      出力: $g \in [0,\, 1]$   ← 他者情報をどれだけ信頼するか
+      ↓
+  Fusion 層
+      $\mathbf{h}_{\text{fused}} = \mathbf{h}_q + g \cdot \mathbf{h}_{\text{ret}}$
+      ↓
+  予測ヘッド（新規学習） → $[\hat{y}_{\text{acc}},\, \hat{y}_{\text{rt}}]$
+
+【Phase 2 で新たに学習されるパラメータ】
+
+  Gate 層       $\mathbf{h}_{\text{ret}}$ の有用性を判定する MLP/Attention
+  Fusion 層     $\mathbf{h}_q$ と $g \cdot \mathbf{h}_{\text{ret}}$ を統合する層
+  予測ヘッド    $\mathbf{h}_{\text{fused}}$ から acc/RT を予測（Phase 1 のヘッドを初期値として使用可）
+  encoder       Phase 1 の重みを初期値としてロード（Freeze または微小 $\mathrm{lr}$ で Fine-tune）
+
+【Phase 2 の学習環境（Phase 1 との違い）】
+
+  - 検索プールの完全固定：final\_bubbles.json を絶対的な DB として使用，バブル変動なし
+  - 対照学習の完全停止：$\mathcal{L}_{\text{con}}$ は計算しない（空間整地は完了済み）
+  - 純粋なタスク損失：$\mathcal{L} = \mathcal{L}_{\text{task}} = \mathrm{MSE}(\hat{\mathbf{y}},\, \mathbf{y})$ のみ
+  - 学習目標：「同一バブル内の他者情報を Gate で通した方が $\mathcal{L}_{\text{task}}$ が下がる」ことを学習
+
+【Memory Bank の設計（検討中）】
+
+  検索単位  ：被験者ごとの $\mathbf{h}$（ウィンドウ平均）を事前計算して固定
+  検索範囲  ：同一バブル内の他者のみ（異バブルは参照しない）
+  検索方法  ：コサイン類似度で上位 $k$ 件を取得（$k$ はハイパーパラメータ）
+
+【GateRAF アーキテクチャ（検討中）】
+
+  Gate 機構  ：MLP（入力: $[\mathbf{h}_q;\, \mathbf{h}_{\text{ret}}]$，出力: スカラー $g$）または
+               Cross-Attention（$\mathbf{h}_q$ をクエリ，$\mathbf{h}_{\text{ret}}$ をキー・バリュー）
+  Multi-Stream：自己系列と他者系列を分離して処理（参照先の不連続性を回避）
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+4. ベースラインとの比較
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  ┌────────────────────────┬──────────────────────────┬──────────────────────────────────┐
+  │                        │   $\lambda=0$（対照学習なし）  │   $\lambda>0$（対照学習あり，本提案）  │
+  ├────────────────────────┼──────────────────────────┼──────────────────────────────────┤
+  │ バブル判定の根拠         │  $h$ の分散（受動的観測）  │  InfoNCE 損失（能動的整形）        │
+  │ $h$ 空間への介入         │  なし                    │  あり（バブル構造に向けて学習）     │
+  │ バブル内の凝集性         │  学習の副産物              │  損失関数が明示的に保証            │
+  │ バブル間の分離性         │  学習の副産物              │  損失関数が明示的に保証            │
+  │ 損失関数（Phase 1）      │  $\mathcal{L}_{\text{task}}$ のみ  │  $\mathcal{L}_{\text{task}} + \lambda \cdot \mathcal{L}_{\text{con}}$  │
+  │ sweep の対象            │  $\theta_{\text{split}},\, \theta_{\text{merge}}$  │  $+\, \lambda,\, \tau$  │
+  └────────────────────────┴──────────────────────────┴──────────────────────────────────┘
+
+  比較実験の構成：
+    A. Phase 1（$\lambda=0$） + Phase 2（GateRAF）  ← バブルなし参照
+    B. Phase 1（$\lambda>0$） + Phase 2（GateRAF）  ← バブルあり参照（本提案）
+    C. Phase 1（$\lambda>0$） のみ                  ← 参照なし予測（上限確認）
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+5. 使用データセット
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+HCP (Human Connectome Project) Young Adult
+  - 被験者数：1,200名（健常若年成人，22-35歳）
+  - タスクfMRI：WorkingMemoryタスク（N-back，LR/RL 2方向）を使用
+  - fMRI仕様：2.0mm isotropic，TR=720ms，全脳72スライス，405時点
+  - 行動データ：条件別反応時間・正答率が被験者ごとに取得済み
+  - アクセス：AWS S3（s3://hcp-openaccess/HCP\_1200/）
+
+事前学習済みエンコーダ：SwiFT（NeurIPS 2023）
+  - 4D volumetric fMRI を入力とする Swin Transformer
+  - HCP・ABCD・UKBiobank で学習済み
+  - 入力：$(B,\, 1,\, 96,\, 96,\, 96,\, 20)$，出力：$(B,\, 288,\, 2,\, 2,\, 2,\, 20)$
+    → pooling で $\mathbf{z} \in \mathbb{R}^{288}$
+  - 凍結して使用し，encoder 層と予測ヘッドのみ学習（Phase 1）
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+6. 完全な数式記述
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+────────────────────────
+6.0  記号の定義
+────────────────────────
+
+  $N$                    被験者数
+  $i \in \{1,\ldots,N\}$ 被験者インデックス
+  $T_i$                  被験者 $i$ の fMRI ウィンドウ数
+  $t \in \{1,\ldots,T_i\}$ ウィンドウインデックス
+  $\mathbf{x}_i^{(t)} \in \mathbb{R}^{96\times96\times96}$   fMRI ボリューム（1ウィンドウ）
+  $\mathbf{y}_i \in \mathbb{R}^2$                           行動ラベル $[y_i^{\text{acc}},\, y_i^{\text{rt}}]$
+  $\mathbf{z}_i^{(t)} \in \mathbb{R}^{288}$                 SwiFT 出力（凍結）
+  $\mathbf{h}_i^{(t)} \in \mathbb{R}^{128}$                 encoder 出力（学習対象）
+  $\bar{\mathbf{h}}_i \in \mathbb{R}^{128}$                 被験者 $i$ の h ウィンドウ平均
+  $\mathbf{c}_B \in \mathbb{R}^{128}$                       バブル $B$ のプロトタイプ
+  $B_i$                  被験者 $i$ が属するバブル
+  $\tau$                 InfoNCE 温度パラメータ
+  $\lambda$              対照学習の重み
+
+
+────────────────────────
+6.1  データ前処理
+────────────────────────
+
+SwiFT（凍結）による特徴抽出：
+
+  $\mathbf{z}_i^{(t)} = f_{\text{SwiFT}}(\mathbf{x}_i^{(t)}) \in \mathbb{R}^{288}$
+
+
+────────────────────────
+6.2  Phase 1 アーキテクチャ
+────────────────────────
+
+Encoder（学習対象）：
+
+  $\mathbf{h}_i^{(t)}
+      = \mathrm{ReLU}\!\left(\mathrm{LN}\!\left(\mathbf{W}_e\, \mathbf{z}_i^{(t)} + \mathbf{b}_e\right)\right)
+      \in \mathbb{R}^{128}$
+
+  $\mathbf{W}_e \in \mathbb{R}^{128\times288},\quad \mathbf{b}_e \in \mathbb{R}^{128}$
+
+被験者レベル表現（ウィンドウ平均）：
+
+  $\bar{\mathbf{h}}_i = \frac{1}{T_i} \sum_{t=1}^{T_i} \mathbf{h}_i^{(t)} \in \mathbb{R}^{128}$
+
+予測ヘッド（学習対象）：
+
+  $\hat{\mathbf{y}}_i^{(t)}
+      = \mathbf{W}_h\, \mathbf{h}_i^{(t)} + \mathbf{b}_h
+      \in \mathbb{R}^2$
+
+  $\mathbf{W}_h \in \mathbb{R}^{2\times128},\quad \mathbf{b}_h \in \mathbb{R}^2$
+
+
+────────────────────────
+6.3  Phase 1 ラウンドループ（ラウンド $r$）
+────────────────────────
+
+【ステップ 1：Frozen Keys の計算（no\_grad）】
+
+  $\bar{\mathbf{h}}_i^{\text{frozen}} = \frac{1}{T_i} \sum_t f_{\text{enc}}(\mathbf{z}_i^{(t)})
+  \quad \forall i$
+
+  $\mathbf{c}_B^{(r)} = \frac{1}{|B|} \sum_{i \in B} \bar{\mathbf{h}}_i^{\text{frozen}}
+  \quad \forall B$
+
+【ステップ 2：勾配ありの学習（LOCAL\_EPOCHS 回繰り返し）】
+
+  コサイン類似度：
+  $\mathrm{sim}(\mathbf{a}, \mathbf{b})
+      = \frac{\mathbf{a}^\top \mathbf{b}}{\|\mathbf{a}\|\,\|\mathbf{b}\|}$
+
+  タスク損失：
+  $\mathcal{L}_{\text{task}}
+      = \frac{1}{N} \sum_{i=1}^{N} \frac{1}{T_i} \sum_{t=1}^{T_i}
+        \left\|\hat{\mathbf{y}}_i^{(t)} - \mathbf{y}_i\right\|_2^2$
+
+  InfoNCE 損失（プロトタイプ $K = |\mathcal{B}|$ 個）：
+  $\mathcal{L}_{\text{con}}
+      = \frac{1}{N} \sum_{i=1}^{N}
+        \left[
+          -\log
+          \frac{\exp\!\left(\mathrm{sim}\!\left(\bar{\mathbf{h}}_i,\,
+                \mathbf{c}_{B_i}^{(r)}\right) / \tau\right)}
+               {\displaystyle\sum_{B' \in \mathcal{B}}
+                \exp\!\left(\mathrm{sim}\!\left(\bar{\mathbf{h}}_i,\,
+                \mathbf{c}_{B'}^{(r)}\right) / \tau\right)}
+        \right]$
+
+  総損失：
+  $\mathcal{L} = \mathcal{L}_{\text{task}} + \lambda\, \mathcal{L}_{\text{con}}$
+
+  パラメータ更新（Adam）：
+  $\boldsymbol{\theta} \leftarrow \boldsymbol{\theta}
+      - \eta\, \nabla_{\boldsymbol{\theta}} \mathcal{L}$
+
+  ただし $\boldsymbol{\theta} = \{\mathbf{W}_e, \mathbf{b}_e, \mathbf{W}_h, \mathbf{b}_h\}$
+
+【ステップ 3：バブル管理（スケジュール実行）】
+
+  コサイン距離：
+  $d(\mathbf{a}, \mathbf{b}) = 1 - \mathrm{sim}(\mathbf{a}, \mathbf{b}) \in [0,\, 2]$
+
+  Reassign（毎 3 ラウンド）：
+  $B_i \leftarrow \operatorname{arg\,min}_{B \in \mathcal{B}}\,
+      d\!\left(\bar{\mathbf{h}}_i,\, \mathbf{c}_B\right)
+  \quad \forall i$
+
+  Split（毎 5 ラウンド）：
+  $d_{\max}(B) = \max_{i,j \in B}\, d(\bar{\mathbf{h}}_i, \bar{\mathbf{h}}_j)$
+
+  $d_{\max}(B) > \theta_{\text{split}}$ のとき：
+  $\quad (i^*, j^*) = \operatorname{arg\,max}_{i,j \in B}\, d(\bar{\mathbf{h}}_i, \bar{\mathbf{h}}_j)$
+  $\quad B_A = \left\{k \in B : d(\bar{\mathbf{h}}_k, \bar{\mathbf{h}}_{i^*})
+                             \leq d(\bar{\mathbf{h}}_k, \bar{\mathbf{h}}_{j^*})\right\}$
+  $\quad B_B = B \setminus B_A$
+  $\quad \theta_{\text{split}} \leftarrow r_{\text{anneal}} \cdot \theta_{\text{split}}$
+
+  Merge（毎 10 ラウンド）：
+  $d(\mathbf{c}_A, \mathbf{c}_B) < \theta_{\text{merge}}
+      \Rightarrow \mathcal{B} \leftarrow \mathcal{B} \setminus \{B\},\quad
+                  A \leftarrow A \cup B$
+
+
+────────────────────────
+6.4  Phase 1 の出力
+────────────────────────
+
+  学習済みパラメータ：
+  $\boldsymbol{\theta}^* = \{\mathbf{W}_e^*, \mathbf{b}_e^*, \mathbf{W}_h^*, \mathbf{b}_h^*\}$
+      （model.pt に保存）
+
+  最終バブル構成：
+  $\mathcal{B}^* = \{B_1^*, B_2^*, \ldots, B_K^*\}$
+      （final\_bubbles.json に保存）
+
+  固定 Memory Bank：
+  $\mathcal{M} = \left\{\bar{\mathbf{h}}_i^* : i \in \{1,\ldots,N\}\right\}$
+      ただし $\bar{\mathbf{h}}_i^* = \frac{1}{T_i}\sum_t f_{\text{enc}}^*(\mathbf{z}_i^{(t)})$（no\_grad）
+
+
+────────────────────────
+6.5  Phase 2 アーキテクチャ（GateRAF）
+────────────────────────
+
+【Memory Bank 検索】
+
+  クエリ：
+  $\mathbf{h}_{q,i}^{(t)} = f_{\text{enc}}^*(\mathbf{z}_i^{(t)}) \in \mathbb{R}^{128}$
+  $\bar{\mathbf{h}}_{q,i} = \frac{1}{T_i} \sum_t \mathbf{h}_{q,i}^{(t)}$
+
+  バブル内 top-$k$ 検索：
+  $\mathcal{N}_i = \operatorname{top-}k_{j \in B_i^*,\, j \neq i}
+      \mathrm{sim}\!\left(\bar{\mathbf{h}}_{q,i},\, \bar{\mathbf{h}}_j^*\right)$
+
+  検索結果の集約：
+  $\mathbf{h}_{\text{ret},i}
+      = \frac{1}{k} \sum_{j \in \mathcal{N}_i} \bar{\mathbf{h}}_j^*
+      \in \mathbb{R}^{128}$
+
+【Gate 層（学習対象）】
+
+  $g_i = \sigma\!\left(\mathrm{MLP}_{\text{gate}}\!\left(
+      \left[\bar{\mathbf{h}}_{q,i};\, \mathbf{h}_{\text{ret},i}\right]
+  \right)\right) \in [0,\, 1]$
+
+  $\mathrm{MLP}_{\text{gate}} : \mathbb{R}^{256} \to \mathbb{R}$
+
+【Fusion 層（学習対象）】
+
+  $\mathbf{h}_{\text{fused},i}
+      = \bar{\mathbf{h}}_{q,i} + g_i \cdot \mathbf{h}_{\text{ret},i}
+      \in \mathbb{R}^{128}$
+
+【予測ヘッド（学習対象）】
+
+  $\hat{\mathbf{y}}_i
+      = \mathbf{W}_h'\, \mathbf{h}_{\text{fused},i} + \mathbf{b}_h'
+      \in \mathbb{R}^2$
+
+
+────────────────────────
+6.6  Phase 2 学習ループ
+────────────────────────
+
+  学習対象パラメータ：
+  $\boldsymbol{\phi} = \{\boldsymbol{\theta}_{\text{gate}},\,
+                         \mathbf{W}_h',\, \mathbf{b}_h'\}$
+  （encoder $\boldsymbol{\theta}^*$ は Freeze または微小 lr で Fine-tune）
+
+  タスク損失のみ（対照学習なし）：
+  $\mathcal{L}_{\text{Phase2}}
+      = \frac{1}{N} \sum_{i=1}^{N}
+        \left\|\hat{\mathbf{y}}_i - \mathbf{y}_i\right\|_2^2$
+
+  パラメータ更新（Adam）：
+  $\boldsymbol{\phi} \leftarrow \boldsymbol{\phi}
+      - \eta'\, \nabla_{\boldsymbol{\phi}}\, \mathcal{L}_{\text{Phase2}}$
+
+  バブル構成は固定：
+  $\mathcal{B}^* = \mathrm{const.}$ （更新しない）
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+7. 期待される効果
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+・バブルなしの GateRAF と比較してスパイク検出精度の向上
+・バブル内参照によるノイズ低減（無関係ユーザの除外）
+・対照学習により $h$ 空間がバブル構造に向けて能動的に整形される
+  → $\theta_{\text{split}}$・$\theta_{\text{merge}}$ の判定精度向上，バブル構成の安定化
+・$\lambda=0$ のベースラインとの比較実験により，対照学習の寄与を定量評価できる
+・2段階設計により Gate 層の学習が安定する（Moving Target 問題を回避）

@@ -1,0 +1,467 @@
+\documentclass[12pt, a4paper]{ltjsarticle}
+\usepackage{luatexja}
+\usepackage{amsmath, amssymb, amsthm}
+\usepackage{bm}
+\usepackage{booktabs}
+\usepackage{geometry}
+\usepackage{hyperref}
+\usepackage{enumitem}
+
+\geometry{margin=25mm}
+
+\hypersetup{colorlinks=true, linkcolor=blue, urlcolor=blue}
+
+\title{研究計画：バブル型クラスタ学習による GateRAF 強化と\\
+       脳 fMRI タスク予測}
+\author{}
+\date{}
+
+\begin{document}
+\maketitle
+\tableofcontents
+\newpage
+
+% ===========================================================
+\section{背景}
+% ===========================================================
+
+\subsection{脳 fMRI タスク予測の意義と困難さ}
+
+ヒトがワーキングメモリタスクを実行しているとき，神経活動は
+血中酸素レベル依存（BOLD）信号として fMRI に記録される．
+この時系列から正答率や反応時間といった行動成績を予測できれば，
+認知機能の個人差や障害の客観的評価につながる．
+
+しかし fMRI 時系列は，予測モデルの構築を困難にする3つの性質を持つ．
+
+\begin{description}
+  \item[スパイク性]
+    刺激提示タイミングに同期した一過性の大きな活動（スパイク）が
+    平常期の中に点在する（図\ref{fig:spike}相当）．
+    モデルは誤差全体の最小化を目指すため，出現頻度の低いスパイクを無視しがちであり，
+    それがそのまま行動予測の誤差につながる．
+
+  \item[スパース性]
+    タスク中に活動する脳領域は全 ROI のごく一部である．
+    単一被験者・単一 ROI の時系列は短く，学習に使える特徴量が少ない．
+
+  \item[個人差の大きさ]
+    同じタスクを実施しても，被験者ごとに活動パターンが大きく異なる．
+    そのまま複数被験者のデータを混合すると，むしろ予測精度が低下することがある．
+\end{description}
+
+\subsection{使用データセット}
+
+\paragraph{HCP (Human Connectome Project) Young Adult}
+\begin{itemize}
+  \item 被験者数：1,200 名（健常若年成人，22--35 歳）
+  \item タスク fMRI：WorkingMemory タスク（2-back, 0-back，LR/RL 2 方向）
+  \item fMRI 仕様：2.0 mm isotropic，TR = 720 ms，全脳 72 スライス，405 時点
+  \item 行動データ：条件別の正答率・反応時間が被験者ごとに取得済み
+  \item 予測ターゲット：2-back 条件の平均正答率 $y^{\text{acc}}$ と
+        中央値反応時間 $y^{\text{rt}}$ の 2 変数
+\end{itemize}
+
+\paragraph{事前学習済みエンコーダ：SwiFT（NeurIPS 2023）}
+SwiFT は 4D volumetric fMRI を入力とする Swin Transformer であり，
+HCP・ABCD・UKBiobank の大規模データで事前学習されている．
+本研究ではその重みを凍結し，固定特徴抽出器として用いる．
+
+\begin{equation}
+  \bm{z}_i^{(t)} = f_{\text{SwiFT}}\!\left(\bm{x}_i^{(t)}\right) \in \mathbb{R}^{288},
+  \quad
+  \bm{x}_i^{(t)} \in \mathbb{R}^{96 \times 96 \times 96}
+  \label{eq:swift}
+\end{equation}
+
+\noindent
+ここで $i$ は被験者インデックス，$t$ はウィンドウインデックスを表す．
+
+% ===========================================================
+\section{課題：既存手法の限界}
+% ===========================================================
+
+\subsection{既存手法1：単純な時系列予測モデル}
+
+最もシンプルなアプローチは，各被験者の $\bm{z}_i^{(t)}$ を軽量な
+encoder + 予測ヘッドに通し，行動ラベルを予測することである：
+
+\begin{align}
+  \bm{h}_i^{(t)}   &= f_{\text{enc}}\!\left(\bm{z}_i^{(t)}\right) \in \mathbb{R}^{128}
+  \label{eq:enc}
+  \\
+  \hat{\bm{y}}_i^{(t)} &= f_{\text{head}}\!\left(\bm{h}_i^{(t)}\right) \in \mathbb{R}^2
+  \label{eq:head}
+\end{align}
+
+\noindent
+損失関数は
+
+\begin{equation}
+  \mathcal{L}_{\text{task}}
+  = \frac{1}{N} \sum_{i=1}^{N} \frac{1}{T_i} \sum_{t=1}^{T_i}
+    \left\|\hat{\bm{y}}_i^{(t)} - \bm{y}_i\right\|_2^2
+  \label{eq:ltask}
+\end{equation}
+
+\noindent
+この手法の限界は，\textbf{各被験者のデータのみ}を使う点にある．
+スパースなタイムポイントや低頻度のスパイクは，
+単一被験者の短い時系列だけでは学習が困難である．
+
+\subsection{既存手法2：RAFによる他者参照}
+
+Retrieval-Augmented Forecasting（RAF）は，
+予測時に類似した他の時系列を検索して参照することで，
+単一系列の情報不足を補う手法である．
+
+\begin{equation}
+  \bm{h}_{\text{ret},i} = \mathrm{Retrieve}\!\left(\bm{h}_{q,i},\, \mathcal{M}\right)
+  \label{eq:retrieve}
+\end{equation}
+
+\noindent
+ここで $\mathcal{M}$ はメモリバンク（全被験者の隠れ状態の集合），
+$\bm{h}_{q,i}$ はクエリとなる被験者 $i$ の隠れ状態である．
+参照された $\bm{h}_{\text{ret},i}$ と自己の $\bm{h}_{q,i}$ を組み合わせることで，
+スパイクや稀なパターンをより精度よく予測できる可能性がある．
+
+\paragraph{問題点：個人差による参照品質の低下}
+しかし素朴な RAF には致命的な欠陥がある．
+被験者間で $h$ 空間の基準（スケール・方向）が揃っていないため，
+コサイン距離で検索しても「本当に似ている被験者」を見つけられず，
+ノイズの多い参照先を引っ張ってきてしまう（図\ref{fig:unaligned}相当）．
+さらに，連続時系列を想定した RAF に対し，
+別被験者の時系列は本質的に不連続であるため，
+そのまま結合するとモデルの学習が不安定になる．
+
+\paragraph{結論}
+\textbf{「参照が有効に機能するためには，まず $h$ 空間を整地する必要がある」}．
+類似した被験者が $h$ 空間上でも近傍に集まっていれば，
+検索は正しく機能し，Gate 機構で不適切な参照を棄却することも可能になる．
+
+% ===========================================================
+\section{解決手段：2 段階バブル型 GateRAF}
+% ===========================================================
+
+\subsection{全体設計の概要}
+
+本研究では以下の 2 段階設計を提案する：
+
+\begin{center}
+\begin{tabular}{ccc}
+  \textbf{Phase 1（空間整地）} & $\longrightarrow$ & \textbf{Phase 2（参照学習）} \\[4pt]
+  対照学習で $h$ 空間をバブル構造に整地 & & 整地された空間で GateRAF を学習
+\end{tabular}
+\end{center}
+
+\noindent
+この分業が必要な理由は \textbf{Moving Target 問題}にある．
+Phase 1 では Split/Merge によりバブルメンバーが変動し続けるため，
+Gate 層を同時に学習させると入力分布が非定常となり収束しない．
+バブルが安定した後に Gate 層を学習することで，この問題を回避する．
+
+\subsection{記号の定義}
+
+\begin{table}[h]
+\centering
+\begin{tabular}{ll}
+  \toprule
+  記号 & 意味 \\
+  \midrule
+  $N$ & 被験者数 \\
+  $i \in \{1,\ldots,N\}$ & 被験者インデックス \\
+  $T_i$ & 被験者 $i$ の fMRI ウィンドウ数 \\
+  $\bm{z}_i^{(t)} \in \mathbb{R}^{288}$ & SwiFT 出力（凍結） \\
+  $\bm{h}_i^{(t)} \in \mathbb{R}^{128}$ & encoder 出力 \\
+  $\bar{\bm{h}}_i \in \mathbb{R}^{128}$ & 被験者 $i$ の $h$ ウィンドウ平均 \\
+  $\bm{c}_B \in \mathbb{R}^{128}$ & バブル $B$ のプロトタイプ \\
+  $B_i$ & 被験者 $i$ が属するバブル \\
+  $\mathcal{B}$ & バブルの集合，$K = |\mathcal{B}|$ \\
+  $\tau$ & InfoNCE 温度パラメータ \\
+  $\lambda$ & 対照学習の重み \\
+  $\theta_{\text{split}},\,\theta_{\text{merge}}$ & Split/Merge の閾値 \\
+  $r_{\text{anneal}}$ & Split 閾値のアニーリング率 \\
+  \bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Phase 1：対照学習によるバブル形成}
+
+\subsubsection*{アーキテクチャ}
+
+\begin{equation}
+  \bm{z}_i^{(t)}
+  \;\xrightarrow{f_{\text{enc}}}\;
+  \bm{h}_i^{(t)} \in \mathbb{R}^{128}
+  \;\xrightarrow{f_{\text{head}}}\;
+  \hat{\bm{y}}_i^{(t)} \in \mathbb{R}^2
+  \label{eq:p1arch}
+\end{equation}
+
+\begin{align}
+  \bm{h}_i^{(t)}
+  &= \mathrm{ReLU}\!\left(\mathrm{LN}\!\left(\bm{W}_e\,\bm{z}_i^{(t)} + \bm{b}_e\right)\right),
+  \quad \bm{W}_e \in \mathbb{R}^{128 \times 288}
+  \\
+  \hat{\bm{y}}_i^{(t)}
+  &= \bm{W}_h\,\bm{h}_i^{(t)} + \bm{b}_h,
+  \quad \bm{W}_h \in \mathbb{R}^{2 \times 128}
+  \\
+  \bar{\bm{h}}_i
+  &= \frac{1}{T_i} \sum_{t=1}^{T_i} \bm{h}_i^{(t)}
+  \label{eq:hbar}
+\end{align}
+
+\subsubsection*{ラウンドループ（ラウンド $r = 1,\ldots,R$）}
+
+\noindent\textbf{Step 1 ― Frozen Keys の計算（\texttt{no\_grad}）}
+
+ラウンド先頭で encoder を固定し，各バブルのプロトタイプを計算する：
+
+\begin{align}
+  \bar{\bm{h}}_i^{\text{frozen}}
+  &= \frac{1}{T_i} \sum_t f_{\text{enc}}\!\left(\bm{z}_i^{(t)}\right)
+  \quad \forall\, i
+  \\
+  \bm{c}_B^{(r)}
+  &= \frac{1}{|B|} \sum_{i \in B} \bar{\bm{h}}_i^{\text{frozen}}
+  \quad \forall\, B \in \mathcal{B}
+\end{align}
+
+\noindent\textbf{Step 2 ― 損失計算と勾配更新}
+
+コサイン類似度を
+$\mathrm{sim}(\bm{a}, \bm{b}) = \bm{a}^\top \bm{b} / (\|\bm{a}\|\,\|\bm{b}\|)$
+と定義する．タスク損失と InfoNCE 損失を以下で計算する：
+
+\begin{align}
+  \mathcal{L}_{\text{task}}
+  &= \frac{1}{N} \sum_{i=1}^{N} \frac{1}{T_i} \sum_{t=1}^{T_i}
+    \left\|\hat{\bm{y}}_i^{(t)} - \bm{y}_i\right\|_2^2
+  \label{eq:ltask2}
+  \\[8pt]
+  \mathcal{L}_{\text{con}}
+  &= \frac{1}{N} \sum_{i=1}^{N}
+    \left[
+      -\log
+      \frac{
+        \exp\!\left(\mathrm{sim}\!\left(\bar{\bm{h}}_i,\,\bm{c}_{B_i}^{(r)}\right) / \tau\right)
+      }{
+        \displaystyle\sum_{B' \in \mathcal{B}}
+        \exp\!\left(\mathrm{sim}\!\left(\bar{\bm{h}}_i,\,\bm{c}_{B'}^{(r)}\right) / \tau\right)
+      }
+    \right]
+  \label{eq:lcon}
+  \\[8pt]
+  \mathcal{L}
+  &= \mathcal{L}_{\text{task}} + \lambda\,\mathcal{L}_{\text{con}}
+  \label{eq:ltotal}
+  \\[4pt]
+  \bm{\theta}
+  &\leftarrow \bm{\theta} - \eta\,\nabla_{\bm{\theta}}\,\mathcal{L},
+  \quad
+  \bm{\theta} = \{\bm{W}_e,\,\bm{b}_e,\,\bm{W}_h,\,\bm{b}_h\}
+\end{align}
+
+\noindent
+$\mathcal{L}_{\text{con}}$ は「自バブルのプロトタイプに引き寄せ，
+他バブルのプロトタイプから遠ざける」圧力を $h$ 空間に与える．
+$\lambda = 0$ のとき $\mathcal{L}_{\text{con}} = 0$ となり，
+ベースライン（対照学習なし）と等価になる．
+
+\noindent\textbf{Step 3 ― バブル管理}
+
+コサイン距離を $d(\bm{a}, \bm{b}) = 1 - \mathrm{sim}(\bm{a}, \bm{b}) \in [0,\,2]$ と定義する．
+
+\smallskip
+\noindent\underline{Reassign}（毎 3 ラウンド）：各被験者を最近傍プロトタイプへ再割り当てする：
+\begin{equation}
+  B_i \leftarrow \operatorname*{arg\,min}_{B \in \mathcal{B}}\,
+  d\!\left(\bar{\bm{h}}_i,\,\bm{c}_B\right)
+  \quad \forall\, i
+\end{equation}
+
+\noindent\underline{Split}（毎 5 ラウンド）：バブル内の最大距離が閾値を超えたら2分割する：
+\begin{align}
+  d_{\max}(B) &= \max_{i,\,j \in B}\, d\!\left(\bar{\bm{h}}_i,\,\bar{\bm{h}}_j\right)
+  \\
+  \text{if }\; d_{\max}(B) &> \theta_{\text{split}}:
+  \notag\\
+  (i^*,\,j^*) &= \operatorname*{arg\,max}_{i,\,j \in B}\, d\!\left(\bar{\bm{h}}_i,\,\bar{\bm{h}}_j\right)
+  \notag\\
+  B_A &= \left\{k \in B : d\!\left(\bar{\bm{h}}_k,\,\bar{\bm{h}}_{i^*}\right)
+                       \leq d\!\left(\bar{\bm{h}}_k,\,\bar{\bm{h}}_{j^*}\right)\right\},
+  \quad B_B = B \setminus B_A
+  \notag\\
+  \theta_{\text{split}} &\leftarrow r_{\text{anneal}} \cdot \theta_{\text{split}}
+  \quad \text{（過分割抑制のためのアニーリング）}
+\end{align}
+
+\noindent\underline{Merge}（毎 10 ラウンド）：プロトタイプが接近したバブルを統合する：
+\begin{equation}
+  d(\bm{c}_A,\,\bm{c}_B) < \theta_{\text{merge}}
+  \;\Rightarrow\;
+  \mathcal{B} \leftarrow \mathcal{B} \setminus \{B\},
+  \quad A \leftarrow A \cup B
+\end{equation}
+
+\subsubsection*{Phase 1 の出力}
+
+\begin{align}
+  \bm{\theta}^* &= \{\bm{W}_e^*,\,\bm{b}_e^*,\,\bm{W}_h^*,\,\bm{b}_h^*\}
+  \quad \text{（\texttt{model.pt}）}
+  \\
+  \mathcal{B}^* &= \{B_1^*,\,\ldots,\,B_K^*\}
+  \quad \text{（\texttt{final\_bubbles.json}）}
+  \\
+  \mathcal{M} &= \left\{\bar{\bm{h}}_i^* : i \in \{1,\ldots,N\}\right\},
+  \quad
+  \bar{\bm{h}}_i^* = \frac{1}{T_i}\sum_t f_{\text{enc}}^*\!\left(\bm{z}_i^{(t)}\right)
+\end{align}
+
+\noindent
+この段階では他者への参照は一切行わない．
+モデルは自分自身の $\bm{z}_i^{(t)}$ だけを使って学習するため，
+空間が未整地な初期状態でも学習が崩壊しない．
+
+\subsection{Phase 2：GateRAF による参照学習}
+
+Phase 1 の完了後，$\bm{\theta}^*$ と $\mathcal{B}^*$ をロードして Phase 2 を開始する．
+この時点で $h$ 空間は整地されており，安全に他者の情報を参照できる．
+
+\subsubsection*{アーキテクチャ}
+
+\begin{equation}
+  \bm{z}_i^{(t)}
+  \;\xrightarrow{f_{\text{enc}}^*}\;
+  \bm{h}_{q,i}^{(t)}
+  \;\xrightarrow{\text{Memory Bank 検索}}\;
+  \bm{h}_{\text{ret},i}
+  \;\xrightarrow{\text{Gate}}\;
+  g_i
+  \;\xrightarrow{\text{Fusion}}\;
+  \bm{h}_{\text{fused},i}
+  \;\xrightarrow{f_{\text{head}}'}\;
+  \hat{\bm{y}}_i
+  \label{eq:p2arch}
+\end{equation}
+
+\noindent\textbf{Memory Bank 検索}
+
+バブル内の上位 $k$ 件をコサイン類似度で検索し集約する：
+
+\begin{align}
+  \bar{\bm{h}}_{q,i}
+  &= \frac{1}{T_i} \sum_t f_{\text{enc}}^*\!\left(\bm{z}_i^{(t)}\right)
+  \\
+  \mathcal{N}_i
+  &= \operatorname{top\text{-}}k_{j \in B_i^*,\,j \neq i}
+     \;\mathrm{sim}\!\left(\bar{\bm{h}}_{q,i},\,\bar{\bm{h}}_j^*\right)
+  \\
+  \bm{h}_{\text{ret},i}
+  &= \frac{1}{k} \sum_{j \in \mathcal{N}_i} \bar{\bm{h}}_j^*
+  \in \mathbb{R}^{128}
+\end{align}
+
+\noindent\textbf{Gate 層}（学習対象）
+
+\begin{equation}
+  g_i
+  = \sigma\!\left(
+      \mathrm{MLP}_{\text{gate}}\!\left(
+        \left[\bar{\bm{h}}_{q,i};\,\bm{h}_{\text{ret},i}\right]
+      \right)
+    \right) \in [0,\,1],
+  \quad
+  \mathrm{MLP}_{\text{gate}} : \mathbb{R}^{256} \to \mathbb{R}
+\end{equation}
+
+\noindent
+$g_i \approx 1$ のとき参照情報を積極的に取り込み，
+$g_i \approx 0$ のとき参照を棄却する（自己完結で予測する）．
+
+\noindent\textbf{Fusion 層}（学習対象）
+
+\begin{equation}
+  \bm{h}_{\text{fused},i}
+  = \bar{\bm{h}}_{q,i} + g_i \cdot \bm{h}_{\text{ret},i}
+  \in \mathbb{R}^{128}
+\end{equation}
+
+\noindent\textbf{予測ヘッド}（学習対象）
+
+\begin{equation}
+  \hat{\bm{y}}_i
+  = \bm{W}_h'\,\bm{h}_{\text{fused},i} + \bm{b}_h'
+  \in \mathbb{R}^2
+\end{equation}
+
+\subsubsection*{学習ループ}
+
+バブル構成は Phase 1 の結果で完全に固定する（$\mathcal{B}^* = \mathrm{const.}$）．
+対照学習は停止し，タスク損失のみで Gate 層と予測ヘッドを学習する：
+
+\begin{align}
+  \bm{\phi} &= \left\{\bm{\theta}_{\text{gate}},\,\bm{W}_h',\,\bm{b}_h'\right\}
+  \\
+  \mathcal{L}_{\text{Phase2}}
+  &= \frac{1}{N} \sum_{i=1}^{N}
+    \left\|\hat{\bm{y}}_i - \bm{y}_i\right\|_2^2
+  \\
+  \bm{\phi}
+  &\leftarrow \bm{\phi} - \eta'\,\nabla_{\bm{\phi}}\,\mathcal{L}_{\text{Phase2}}
+\end{align}
+
+\noindent
+「同一バブル内の他者情報を Gate で通した方が $\mathcal{L}_{\text{Phase2}}$ が下がる」
+という純粋な目的に沿って Gate の開閉ルールが学習される．
+
+% ===========================================================
+\section{予想される成果}
+% ===========================================================
+
+\subsection{比較実験の設計}
+
+本提案の有効性を検証するため，以下の3条件を比較する：
+
+\begin{table}[h]
+\centering
+\begin{tabular}{llll}
+  \toprule
+  条件 & Phase 1 & Phase 2 & 検証する仮説 \\
+  \midrule
+  A & $\lambda = 0$（対照学習なし） & GateRAF & バブル整地の寄与 \\
+  B & $\lambda > 0$（対照学習あり）& GateRAF & \textbf{本提案} \\
+  C & $\lambda > 0$（対照学習あり）& なし    & 参照機構の寄与 \\
+  \bottomrule
+\end{tabular}
+\end{table}
+
+\noindent
+条件 B $>$ 条件 A であれば「$h$ 空間の整地が参照精度を高める」ことが示される．\\
+条件 B $>$ 条件 C であれば「バブル内参照が予測を向上させる」ことが示される．
+
+\subsection{期待される効果}
+
+\begin{enumerate}
+  \item \textbf{スパイク予測精度の向上}\\
+    バブル内の類似被験者の隠れ状態を参照することで，
+    単一被験者データでは捉えにくいスパイク直前のパターンを補完できる．
+    これにより条件 B は条件 A・C に比べてスパイク周辺のMSEが低下すると期待される．
+
+  \item \textbf{ノイズ低減}\\
+    参照範囲をバブル内に限定することで，$h$ 空間が遠い（＝認知パターンが異なる）
+    被験者の情報が混入しない．Gate 機構がさらに参照の質を保証する．
+
+  \item \textbf{$h$ 空間の凝集性・分離性の向上}\\
+    $\mathcal{L}_{\text{con}}$ により，同一バブル内の $\bar{\bm{h}}_i$ は互いに引き寄せられ，
+    異バブルの $\bar{\bm{h}}_i$ とは遠ざかる．
+    これは Split/Merge の判定精度を高め，バブル構成を安定させる．
+
+  \item \textbf{Gate の正則化効果}\\
+    有用な参照のみを取り込む Gate 機構は，
+    少ないデータ量でも過適合を抑えるドロップアウト的な効果を持つ可能性がある．
+\end{enumerate}
+
+\end{document}
