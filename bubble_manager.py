@@ -87,14 +87,18 @@ class BubbleManager:
 
         self.bubbles = {bid: clients for bid, clients in new_bubbles.items() if clients}
 
-    def split_bubbles(self, h_subject):
-        """バブル内の最大コサイン距離が split_threshold を超えたら2分割"""
+    def split_bubbles(self, h_subject, min_size=1):
+        """バブル内の最大コサイン距離が split_threshold を超えたら2分割
+
+        min_size: 分割後の各グループの最小メンバー数．
+                  どちらかのグループが min_size 未満になる場合は分割しない．
+        """
         new_bubbles = {}
         new_assignments = {}
 
         for bid, clients in self.bubbles.items():
             active = [c for c in clients if c in h_subject]
-            if len(active) < 2:
+            if len(active) < 2 * min_size:
                 new_bubbles[bid] = clients
                 for c in clients:
                     new_assignments[c] = bid
@@ -109,14 +113,17 @@ class BubbleManager:
                     new_assignments[c] = bid
             else:
                 group_a, group_b = self._bipartition(active, dist)
-                for group in (group_a, group_b):
-                    if not group:
-                        continue
-                    new_id = self._next_id
-                    self._next_id += 1
-                    new_bubbles[new_id] = set(group)
-                    for c in group:
-                        new_assignments[c] = new_id
+                if len(group_a) < min_size or len(group_b) < min_size:
+                    new_bubbles[bid] = clients
+                    for c in clients:
+                        new_assignments[c] = bid
+                else:
+                    for group in (group_a, group_b):
+                        new_id = self._next_id
+                        self._next_id += 1
+                        new_bubbles[new_id] = set(group)
+                        for c in group:
+                            new_assignments[c] = new_id
 
         self.bubbles = new_bubbles
         self.client_to_bubble = new_assignments

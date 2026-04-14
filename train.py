@@ -28,7 +28,7 @@ from bubble_manager import BubbleManager
 
 
 DATA_DIR = Path(__file__).parent / "data"
-N_ROUNDS = 30
+N_ROUNDS = 60
 LOCAL_EPOCHS = 2
 LR = 1e-3
 LAMBDA_CON = 0.5
@@ -36,8 +36,10 @@ TEMPERATURE = 0.1
 SPLIT_EVERY = 5
 MERGE_EVERY = 10
 REASSIGN_EVERY = 3
-SPLIT_THRESHOLD = 0.3
-MERGE_THRESHOLD = 0.05
+SPLIT_THRESHOLD = 0.12   # バブル内の最大コサイン距離がこれを超えたら分割
+MERGE_THRESHOLD = 0.05   # バブル間プロトタイプのコサイン距離がこれ以下なら統合
+ANNEALING_RATE = 1.15    # 分割のたびに閾値を拡大（過分割を抑制）
+MIN_SPLIT_SIZE = 5       # 分割後の最小バブルサイズ
 
 
 def get_subject_ids():
@@ -81,6 +83,7 @@ def load_all_tensors(subject_datasets, device):
             "labels": torch.stack([torch.stack(acc_list), torch.stack(rt_list)], dim=1).to(device),
         }
     return data
+
 
 
 @torch.no_grad()
@@ -224,6 +227,9 @@ def run(subject_datasets, client_ids, label_stats, results_dir,
     results_dir.mkdir(parents=True, exist_ok=True)
     device = get_device()
 
+    torch.manual_seed(42)
+    np.random.seed(42)
+
     all_data = load_all_tensors(subject_datasets, device)
     model = ClientModel().to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
@@ -289,12 +295,13 @@ def run(subject_datasets, client_ids, label_stats, results_dir,
 
         if (round_idx + 1) % SPLIT_EVERY == 0:
             before = server.n_bubbles
-            server.split_bubbles(h_subject)
+            server.split_bubbles(h_subject, min_size=MIN_SPLIT_SIZE)
             after = server.n_bubbles
             if after > before:
                 n_splits += after - before
+            server.split_threshold *= ANNEALING_RATE
             if verbose:
-                print(f"  [Split] {before} → {after} bubbles (threshold={split_threshold:.3f})")
+                print(f"  [Split] {before} → {after} bubbles (threshold={server.split_threshold/ANNEALING_RATE:.3f}→{server.split_threshold:.3f})")
 
         if (round_idx + 1) % MERGE_EVERY == 0:
             before = server.n_bubbles
