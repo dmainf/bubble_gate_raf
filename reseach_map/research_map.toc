@@ -1,27 +1,18 @@
-\contentsline {section}{\numberline {1}なぜ GateRAF か}{2}{section.1}%
-\contentsline {paragraph}{系列の多さ}{2}{section.1}%
-\contentsline {paragraph}{スパイク}{2}{section.1}%
-\contentsline {paragraph}{スパース}{2}{section.1}%
-\contentsline {paragraph}{シンプルな RAF では不十分な理由}{2}{section.1}%
-\contentsline {paragraph}{脳データ固有の追加課題}{2}{section.1}%
-\contentsline {section}{\numberline {2}研究の核心：2 段階設計}{2}{section.2}%
-\contentsline {paragraph}{2 段階が必須な理由：Moving Target 問題}{2}{section.2}%
-\contentsline {section}{\numberline {3}Phase 1：バブル形成（実装済み）}{3}{section.3}%
-\contentsline {section}{\numberline {4}Phase 2：GateRAF（実装予定）}{4}{section.4}%
-\contentsline {section}{\numberline {5}ベースラインとの比較}{4}{section.5}%
-\contentsline {paragraph}{比較実験の構成}{4}{section.5}%
-\contentsline {section}{\numberline {6}使用データセット}{5}{section.6}%
-\contentsline {paragraph}{HCP (Human Connectome Project) Young Adult}{5}{section.6}%
-\contentsline {paragraph}{事前学習済みエンコーダ：SwiFT（NeurIPS 2023）}{5}{section.6}%
-\contentsline {section}{\numberline {7}完全な数式記述}{5}{section.7}%
-\contentsline {subsection}{\numberline {7.1}記号の定義}{5}{subsection.7.1}%
-\contentsline {subsection}{\numberline {7.2}データ前処理}{5}{subsection.7.2}%
-\contentsline {subsection}{\numberline {7.3}Phase 1 アーキテクチャ}{5}{subsection.7.3}%
-\contentsline {paragraph}{Encoder（学習対象）}{5}{subsection.7.3}%
-\contentsline {paragraph}{被験者レベル表現（ウィンドウ平均）}{5}{equation.2}%
-\contentsline {paragraph}{予測ヘッド（学習対象）}{6}{equation.3}%
-\contentsline {subsection}{\numberline {7.4}Phase 1 ラウンドループ（ラウンド $r$）}{6}{subsection.7.4}%
-\contentsline {subsection}{\numberline {7.5}Phase 1 の出力}{8}{subsection.7.5}%
-\contentsline {subsection}{\numberline {7.6}Phase 2 アーキテクチャ（GateRAF）}{8}{subsection.7.6}%
-\contentsline {subsection}{\numberline {7.7}Phase 2 学習ループ}{8}{subsection.7.7}%
-\contentsline {section}{\numberline {8}期待される効果}{9}{section.8}%
+\contentsline {section}{\numberline {1}背景}{2}{section.1}%
+\contentsline {subsection}{\numberline {1.1}脳 fMRI タスク予測の意義と困難さ}{2}{subsection.1.1}%
+\contentsline {subsection}{\numberline {1.2}使用データセット}{2}{subsection.1.2}%
+\contentsline {paragraph}{HCP (Human Connectome Project) Young Adult}{2}{section*.2}%
+\contentsline {paragraph}{事前学習済みエンコーダ：SwiFT（NeurIPS 2023）}{2}{section*.3}%
+\contentsline {section}{\numberline {2}課題：既存手法の限界}{3}{section.2}%
+\contentsline {subsection}{\numberline {2.1}既存手法1：単純な時系列予測モデル}{3}{subsection.2.1}%
+\contentsline {subsection}{\numberline {2.2}既存手法2：RAFによる他者参照}{3}{subsection.2.2}%
+\contentsline {paragraph}{問題点：個人差による参照品質の低下}{3}{section*.4}%
+\contentsline {paragraph}{結論}{3}{section*.5}%
+\contentsline {section}{\numberline {3}解決手段：2 段階バブル型 GateRAF}{4}{section.3}%
+\contentsline {subsection}{\numberline {3.1}全体設計の概要}{4}{subsection.3.1}%
+\contentsline {subsection}{\numberline {3.2}記号の定義}{4}{subsection.3.2}%
+\contentsline {subsection}{\numberline {3.3}Phase 1：対照学習によるバブル形成}{4}{subsection.3.3}%
+\contentsline {subsection}{\numberline {3.4}Phase 2：GateRAF による参照学習}{6}{subsection.3.4}%
+\contentsline {section}{\numberline {4}予想される成果}{7}{section.4}%
+\contentsline {subsection}{\numberline {4.1}比較実験の設計}{7}{subsection.4.1}%
+\contentsline {subsection}{\numberline {4.2}期待される効果}{8}{subsection.4.2}%

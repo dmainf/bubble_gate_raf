@@ -1,4 +1,4 @@
-This is LuaHBTeX, Version 1.24.0 (TeX Live 2026)  (format=lualatex 2026.3.30)  14 APR 2026 17:02
+This is LuaHBTeX, Version 1.24.0 (TeX Live 2026)  (format=lualatex 2026.3.30)  14 APR 2026 20:24
  restricted system commands enabled.
 **research_map.tex
 (./research_map.tex
@@ -143,9 +143,7 @@ Custom whatsit direction = 4
 Custom whatsit box_boundary = 5
 Custom whatsit ja_al_boundary = 6
 Module luatexbase Info: Uninstalling kernel luatexbase code on input line 184
-(save cache: /Users/dmainf/Library/texlive/2026/texmf-var/luatexja/ltj-cid-auto-
-adobe-japan1.lua.gz)(save cache: /Users/dmainf/Library/texlive/2026/texmf-var/lu
-atexja/ltj-cid-auto-adobe-japan1.luc)
+(load cache: ltj-cid-auto-adobe-japan1.luc)
 Lua module: luatexja.charrange 2022-08-19 Handling the range of Japanese charact
 ers
 Lua module: luatexja.stack 2022-08-20 LuaTeX-ja stack system
@@ -264,11 +262,7 @@ Package: ltj-base 2021-03-16
 \ltj@@lua@unboxcheckdir@inner=\luafunction57
 \ltj@@lua@uncopycheckdir@inner=\luafunction58
 \ltj@@lua@uncopy@restore@whatsit@inner=\luafunction59
-
-(/usr/local/texlive/2026/texmf-dist/tex/luatex/luatexja/ltj-kinsoku.tex(save cac
-he: /Users/dmainf/Library/texlive/2026/texmf-var/luatexja/ltj-kinsoku_default.lu
-a.gz)(save cache: /Users/dmainf/Library/texlive/2026/texmf-var/luatexja/ltj-kins
-oku_default.luc))
+(load cache: ltj-kinsoku_default.luc)
 (/usr/local/texlive/2026/texmf-dist/tex/luatex/luatexja/ltj-latex.sty
 Package: ltj-latex 2025-06-08 LaTeX support of LuaTeX-ja
 Inserting `ltj.direction' in `pre_shipout_filter'.
@@ -624,20 +618,16 @@ LaTeX Info: Redefining \fontshapeforce on input line 833.
 )
 (/usr/local/texlive/2026/texmf-dist/tex/luatex/luatexja/patches/lltjdefs.sty
 Package: lltjdefs 2024-05-16 Default font settings of LuaTeX-ja
-luaotfload | db : Font names database not found, generating new one.
-luaotfload | db : This can take several minutes; please be patient.(save cache: 
-/Users/dmainf/Library/texlive/2026/texmf-var/luatexja/extra_lmroman10-regular.lu
-a.gz)(save cache: /Users/dmainf/Library/texlive/2026/texmf-var/luatexja/extra_lm
-roman10-regular.luc)
+luaotfload | db : Font names database loaded from /Users/dmainf/Library/texlive/
+2026/texmf-var/luatex-cache/generic/names/luaotfload-names.luc.gz(load cache: ex
+tra_lmroman10-regular.luc)
 LaTeX Font Info:    Font shape `JT3/mc/m/n' will be
 (Font)              scaled to size 9.24713pt on input line 69.
 
 (/usr/local/texlive/2026/texmf-dist/tex/luatex/luatexja/jfm-ujisv.lua)
 LaTeX Font Info:    Font shape `JY3/mc/m/n' will be
 (Font)              scaled to size 9.24713pt on input line 69.
-(save cache: /Users/dmainf/Library/texlive/2026/texmf-var/luatexja/extra_haranoa
-jimincho-regular.lua.gz)(save cache: /Users/dmainf/Library/texlive/2026/texmf-va
-r/luatexja/extra_haranoajimincho-regular.luc)
+(load cache: extra_haranoajimincho-regular.luc)
 (/usr/local/texlive/2026/texmf-dist/tex/luatex/luatexja/jfm-ujis.lua)
 \symmincho=\mathgroup4
 LaTeX Font Info:    Overwriting symbol font `mincho' in version `bold'
@@ -667,9 +657,7 @@ Inserting `l3color' in `luaotfload.parse_color'.))
 \@Br=\box66
 \@CL=\box67
 \@CR=\box68
-(save cache: /Users/dmainf/Library/texlive/2026/texmf-var/luatexja/extra_lmmono9
--regular.lua.gz)(save cache: /Users/dmainf/Library/texlive/2026/texmf-var/luatex
-ja/extra_lmmono9-regular.luc)
+(load cache: extra_lmmono9-regular.luc)
 \@bannertoken=\toks27
 \@@paperheight=\dimen163
 \@@paperwidth=\dimen164
@@ -692,8 +680,7 @@ Package: ifluatex 2019/10/25 v1.5 ifluatex legacy package. Use iftex instead.
 )
 (/usr/local/texlive/2026/texmf-dist/tex/luatex/luatexja/luatexja-compat.sty
 Package: luatexja-compat 2025-09-21 Compatibility with pTeX
-(save cache: /Users/dmainf/Library/texlive/2026/texmf-var/luatexja/ltj-jisx0208.
-luc)
+(load cache: ltj-jisx0208.luc)
 \hour=\count284
 \minute=\count285
 ))
@@ -701,9 +688,7 @@ luc)
 \jsc@mmm=\dimen167
 \ltjs@@magnify@font@calc=\luafunction74
 \jsc@smallskipamount=\skip49
-(save cache: /Users/dmainf/Library/texlive/2026/texmf-var/luatexja/extra_lmroman
-8-regular.lua.gz)(save cache: /Users/dmainf/Library/texlive/2026/texmf-var/luate
-xja/extra_lmroman8-regular.luc)
+(load cache: extra_lmroman8-regular.luc)
 LaTeX Font Info:    Font shape `JY3/mc/m/n' will be
 (Font)              scaled to size 7.70596pt on input line 417.
 LaTeX Font Info:    Font shape `JT3/mc/m/n' will be
@@ -993,48 +978,35 @@ Package: enumitem 2025/02/06 v3.11 Customized lists
 \enit@count@id=\count325
 \enitdp@description=\count326
 )
-(/usr/local/texlive/2026/texmf-dist/tex/latex/titlesec/titlesec.sty
-Package: titlesec 2025/01/04 v2.17 Sectioning titles
-\ttl@box=\box74
-\beforetitleunit=\skip60
-\aftertitleunit=\skip61
-\ttl@plus=\dimen263
-\ttl@minus=\dimen264
-\ttl@toksa=\toks42
-\titlewidth=\dimen265
-\titlewidthlast=\dimen266
-\titlewidthfirst=\dimen267
-)
-Package hyperref Info: Option `colorlinks' set `true' on input line 17.
+Package hyperref Info: Option `colorlinks' set `true' on input line 12.
 
-(./research_map.aux)
+No file research_map.aux.
+
 \openout1 = research_map.aux
-
-LaTeX Font Info:    Checking defaults for OML/cmm/m/it on input line 23.
-LaTeX Font Info:    ... okay on input line 23.
-LaTeX Font Info:    Checking defaults for OMS/cmsy/m/n on input line 23.
-LaTeX Font Info:    ... okay on input line 23.
-LaTeX Font Info:    Checking defaults for OT1/cmr/m/n on input line 23.
-LaTeX Font Info:    ... okay on input line 23.
-LaTeX Font Info:    Checking defaults for T1/cmr/m/n on input line 23.
-LaTeX Font Info:    ... okay on input line 23.
-LaTeX Font Info:    Checking defaults for TS1/cmr/m/n on input line 23.
-LaTeX Font Info:    ... okay on input line 23.
-LaTeX Font Info:    Checking defaults for TU/lmr/m/n on input line 23.
-LaTeX Font Info:    ... okay on input line 23.
-LaTeX Font Info:    Checking defaults for OMX/cmex/m/n on input line 23.
-LaTeX Font Info:    ... okay on input line 23.
-LaTeX Font Info:    Checking defaults for U/cmr/m/n on input line 23.
-LaTeX Font Info:    ... okay on input line 23.
-LaTeX Font Info:    Checking defaults for JY3/mc/m/n on input line 23.
-LaTeX Font Info:    ... okay on input line 23.
-LaTeX Font Info:    Checking defaults for JT3/mc/m/n on input line 23.
-LaTeX Font Info:    ... okay on input line 23.
-LaTeX Font Info:    Checking defaults for PD1/pdf/m/n on input line 23.
-LaTeX Font Info:    ... okay on input line 23.
-LaTeX Font Info:    Checking defaults for PU/pdf/m/n on input line 23.
-LaTeX Font Info:    ... okay on input line 23.
-
+LaTeX Font Info:    Checking defaults for OML/cmm/m/it on input line 19.
+LaTeX Font Info:    ... okay on input line 19.
+LaTeX Font Info:    Checking defaults for OMS/cmsy/m/n on input line 19.
+LaTeX Font Info:    ... okay on input line 19.
+LaTeX Font Info:    Checking defaults for OT1/cmr/m/n on input line 19.
+LaTeX Font Info:    ... okay on input line 19.
+LaTeX Font Info:    Checking defaults for T1/cmr/m/n on input line 19.
+LaTeX Font Info:    ... okay on input line 19.
+LaTeX Font Info:    Checking defaults for TS1/cmr/m/n on input line 19.
+LaTeX Font Info:    ... okay on input line 19.
+LaTeX Font Info:    Checking defaults for TU/lmr/m/n on input line 19.
+LaTeX Font Info:    ... okay on input line 19.
+LaTeX Font Info:    Checking defaults for OMX/cmex/m/n on input line 19.
+LaTeX Font Info:    ... okay on input line 19.
+LaTeX Font Info:    Checking defaults for U/cmr/m/n on input line 19.
+LaTeX Font Info:    ... okay on input line 19.
+LaTeX Font Info:    Checking defaults for JY3/mc/m/n on input line 19.
+LaTeX Font Info:    ... okay on input line 19.
+LaTeX Font Info:    Checking defaults for JT3/mc/m/n on input line 19.
+LaTeX Font Info:    ... okay on input line 19.
+LaTeX Font Info:    Checking defaults for PD1/pdf/m/n on input line 19.
+LaTeX Font Info:    ... okay on input line 19.
+LaTeX Font Info:    Checking defaults for PU/pdf/m/n on input line 19.
+LaTeX Font Info:    ... okay on input line 19.
 *geometry* driver: auto-detecting
 *geometry* detected driver: luatex
 *geometry* verbose mode - [ preamble ] result:
@@ -1083,307 +1055,137 @@ File: luatex.def 2025/09/29 v1.2f Graphics/color driver for luatex
 (/usr/local/texlive/2026/texmf-dist/tex/context/base/mkii/supp-pdf.mkii
 [Loading MPS to PDF converter (version 2006.09.02).]
 \scratchcounter=\count327
-\scratchdimen=\dimen268
-\scratchbox=\box75
+\scratchdimen=\dimen263
+\scratchbox=\box74
 \nofMPsegments=\count328
 \nofMParguments=\count329
-\everyMPshowfont=\toks43
+\everyMPshowfont=\toks42
 \MPscratchCnt=\count330
-\MPscratchDim=\dimen269
+\MPscratchDim=\dimen264
 \MPnumerator=\count331
 \makeMPintoPDFobject=\count332
-\everyMPtoPDFconversion=\toks44
+\everyMPtoPDFconversion=\toks43
 )) (/usr/local/texlive/2026/texmf-dist/tex/latex/graphics/mathcolor.ltx))
-Package hyperref Info: Link coloring ON on input line 23.
-
-(./research_map.out) (./research_map.out)
+Package hyperref Info: Link coloring ON on input line 19.
 \@outlinefile=\write3
 
 \openout3 = research_map.out
-(save cache: /Users/dmainf/Library/texlive/2026/texmf-var/luatexja/extra_lmroman
-17-regular.lua.gz)(save cache: /Users/dmainf/Library/texlive/2026/texmf-var/luat
-exja/extra_lmroman17-regular.luc)
+(load cache: extra_lmroman17-regular.luc)
 LaTeX Font Info:    Font shape `JT3/mc/m/n' will be
-(Font)              scaled to size 15.97902pt on input line 25.
+(Font)              scaled to size 15.97902pt on input line 21.
 LaTeX Font Info:    Font shape `JY3/mc/m/n' will be
-(Font)              scaled to size 15.97902pt on input line 25.
-(save cache: /Users/dmainf/Library/texlive/2026/texmf-var/luatexja/extra_lmroman
-12-regular.lua.gz)(save cache: /Users/dmainf/Library/texlive/2026/texmf-var/luat
-exja/extra_lmroman12-regular.luc)
+(Font)              scaled to size 15.97902pt on input line 21.
+(load cache: extra_lmroman12-regular.luc)
 LaTeX Font Info:    Font shape `JT3/mc/m/n' will be
-(Font)              scaled to size 11.09656pt on input line 25.
+(Font)              scaled to size 11.09656pt on input line 21.
 LaTeX Font Info:    Font shape `JY3/mc/m/n' will be
-(Font)              scaled to size 11.09656pt on input line 25.
-LaTeX Font Info:    Calculating math sizes for size <14.39996> on input line 25
+(Font)              scaled to size 11.09656pt on input line 21.
+LaTeX Font Info:    Calculating math sizes for size <14.39996> on input line 21
 .
 LaTeX Font Info:    Font shape `JY3/mc/m/n' will be
-(Font)              scaled to size 7.76755pt on input line 25.
+(Font)              scaled to size 7.76755pt on input line 21.
 LaTeX Font Info:    Font shape `JY3/mc/m/n' will be
-(Font)              scaled to size 5.54828pt on input line 25.
-LaTeX Font Info:    Trying to load font information for U+msa on input line 25.
+(Font)              scaled to size 5.54828pt on input line 21.
+LaTeX Font Info:    Trying to load font information for U+msa on input line 21.
 
 
 (/usr/local/texlive/2026/texmf-dist/tex/latex/amsfonts/umsa.fd
 File: umsa.fd 2013/01/14 v3.01 AMS symbols A
 )
-LaTeX Font Info:    Trying to load font information for U+msb on input line 25.
+LaTeX Font Info:    Trying to load font information for U+msb on input line 21.
 
 
 (/usr/local/texlive/2026/texmf-dist/tex/latex/amsfonts/umsb.fd
 File: umsb.fd 2013/01/14 v3.01 AMS symbols B
 )
 LaTeX Font Info:    Font shape `JY3/gt/m/n' will be
-(Font)              scaled to size 11.09656pt on input line 25.
-(save cache: /Users/dmainf/Library/texlive/2026/texmf-var/luatexja/extra_haranoa
-jigothic-medium.lua.gz)(save cache: /Users/dmainf/Library/texlive/2026/texmf-var
-/luatexja/extra_haranoajigothic-medium.luc)
+(Font)              scaled to size 11.09656pt on input line 21.
+(load cache: extra_haranoajigothic-medium.luc)
 LaTeX Font Info:    Font shape `JY3/gt/m/n' will be
-(Font)              scaled to size 7.76755pt on input line 25.
+(Font)              scaled to size 7.76755pt on input line 21.
 LaTeX Font Info:    Font shape `JY3/gt/m/n' will be
-(Font)              scaled to size 5.54828pt on input line 25.
+(Font)              scaled to size 5.54828pt on input line 21.
 LaTeX Font Info:    Font shape `JT3/gt/m/n' will be
-(Font)              scaled to size 9.24713pt on input line 25.
+(Font)              scaled to size 9.24713pt on input line 21.
 LaTeX Font Info:    Font shape `JY3/gt/m/n' will be
-(Font)              scaled to size 9.24713pt on input line 25.
-(save cache: /Users/dmainf/Library/texlive/2026/texmf-var/luatexja/extra_lmsans1
-0-regular.lua.gz)(save cache: /Users/dmainf/Library/texlive/2026/texmf-var/luate
-xja/extra_lmsans10-regular.luc)
+(Font)              scaled to size 9.24713pt on input line 21.
+(load cache: extra_lmsans10-regular.luc)
 LaTeX Font Info:    Font shape `JT3/mc/m/n' will be
-(Font)              scaled to size 13.31586pt on input line 25.
+(Font)              scaled to size 13.31586pt on input line 21.
 LaTeX Font Info:    Font shape `JY3/mc/m/n' will be
-(Font)              scaled to size 13.31586pt on input line 25.
+(Font)              scaled to size 13.31586pt on input line 21.
 LaTeX Font Info:    Font shape `JT3/gt/m/n' will be
-(Font)              scaled to size 13.31586pt on input line 25.
+(Font)              scaled to size 13.31586pt on input line 21.
 LaTeX Font Info:    Font shape `JY3/gt/m/n' will be
-(Font)              scaled to size 13.31586pt on input line 25.
-(save cache: /Users/dmainf/Library/texlive/2026/texmf-var/luatexja/extra_lmsans1
-2-regular.lua.gz)(save cache: /Users/dmainf/Library/texlive/2026/texmf-var/luate
-xja/extra_lmsans12-regular.luc)
-(./research_map.toc)
+(Font)              scaled to size 13.31586pt on input line 21.
+(load cache: extra_lmsans12-regular.luc)
+No file research_map.toc.
 \tf@toc=\write4
 
 \openout4 = research_map.toc
- [1
+[1
 
 {/usr/local/texlive/2026/texmf-var/fonts/map/pdftex/updmap/pdftex.map}]
+LaTeX Font Info:    Font shape `JT3/gt/m/n' will be
+(Font)              scaled to size 11.09656pt on input line 28.
+(load cache: extra_lmroman10-bold.luc)
+LaTeX Font Info:    Font shape `JT3/mc/b/n' in size <10> not available
+(Font)              Font shape `JT3/gt/m/n' tried instead on input line 40.
+LaTeX Font Info:    Font shape `JT3/gt/m/n' will be
+(Font)              scaled to size 7.70596pt on input line 40.
+LaTeX Font Info:    Font shape `JY3/mc/b/n' in size <10> not available
+(Font)              Font shape `JY3/gt/m/n' tried instead on input line 40.
+LaTeX Font Info:    Font shape `JY3/gt/m/n' will be
+(Font)              scaled to size 7.70596pt on input line 40.
 
-! Package titlesec Error: Entered in horizontal mode.
 
-See the titlesec package documentation for explanation.
-Type  H <return>  for immediate help.
- ...                                              
-                                                  
-l.34 \paragraph{系列の多さ}
-                                󿿿
-The <format> argument cannot contain horizontal material
-such as text, \noindent, \makebox, etc.
+LaTeX Warning: Reference `fig:spike' on page 2 undefined on input line 40.
 
-LaTeX Font Info:    Calculating math sizes for size <11.99997> on input line 35
+LaTeX Font Info:    Calculating math sizes for size <11.99997> on input line 61
 .
 LaTeX Font Info:    Font shape `JY3/mc/m/n' will be
-(Font)              scaled to size 6.47295pt on input line 35.
+(Font)              scaled to size 6.47295pt on input line 61.
 LaTeX Font Info:    Font shape `JY3/mc/m/n' will be
-(Font)              scaled to size 4.62357pt on input line 35.
+(Font)              scaled to size 4.62357pt on input line 61.
 LaTeX Font Info:    Font shape `JY3/gt/m/n' will be
-(Font)              scaled to size 6.47295pt on input line 35.
+(Font)              scaled to size 6.47295pt on input line 61.
 LaTeX Font Info:    Font shape `JY3/gt/m/n' will be
-(Font)              scaled to size 4.62357pt on input line 35.
-
-! Package titlesec Error: Entered in horizontal mode.
-
-See the titlesec package documentation for explanation.
-Type  H <return>  for immediate help.
- ...                                              
-                                                  
-l.40 \paragraph{スパイク}
-                             󿿿
-The <format> argument cannot contain horizontal material
-such as text, \noindent, \makebox, etc.
-
-
-! Package titlesec Error: Entered in horizontal mode.
-
-See the titlesec package documentation for explanation.
-Type  H <return>  for immediate help.
- ...                                              
-                                                  
-l.46 \paragraph{スパース}
-                             󿿿
-The <format> argument cannot contain horizontal material
-such as text, \noindent, \makebox, etc.
-
-
-! Package titlesec Error: Entered in horizontal mode.
-
-See the titlesec package documentation for explanation.
-Type  H <return>  for immediate help.
- ...                                              
-                                                  
-l.51 ...ンプルな RAF では不十分な理由}
-                                                  󿿿
-The <format> argument cannot contain horizontal material
-such as text, \noindent, \makebox, etc.
-
-
-! Package titlesec Error: Entered in horizontal mode.
-
-See the titlesec package documentation for explanation.
-Type  H <return>  for immediate help.
- ...                                              
-                                                  
-l.56 \paragraph{脳データ固有の追加課題}
-                                                  󿿿
-The <format> argument cannot contain horizontal material
-such as text, \noindent, \makebox, etc.
-
-(save cache: /Users/dmainf/Library/texlive/2026/texmf-var/luatexja/extra_lmroman
-10-bold.lua.gz)(save cache: /Users/dmainf/Library/texlive/2026/texmf-var/luatexj
-a/extra_lmroman10-bold.luc)
-LaTeX Font Info:    Font shape `JT3/mc/b/n' in size <10> not available
-(Font)              Font shape `JT3/gt/m/n' tried instead on input line 69.
-LaTeX Font Info:    Font shape `JT3/gt/m/n' will be
-(Font)              scaled to size 7.70596pt on input line 69.
-LaTeX Font Info:    Font shape `JY3/mc/b/n' in size <10> not available
-(Font)              Font shape `JY3/gt/m/n' tried instead on input line 69.
-LaTeX Font Info:    Font shape `JY3/gt/m/n' will be
-(Font)              scaled to size 7.70596pt on input line 69.
-
-! Package titlesec Error: Entered in horizontal mode.
-
-See the titlesec package documentation for explanation.
-Type  H <return>  for immediate help.
- ...                                              
-                                                  
-l.75 ...が必須な理由：Moving Target 問題}
-                                                  󿿿
-The <format> argument cannot contain horizontal material
-such as text, \noindent, \makebox, etc.
-
+(Font)              scaled to size 4.62357pt on input line 61.
+(load cache: extra_lmroman7-regular.luc)
+LaTeX Font Info:    Font shape `JT3/mc/m/n' will be
+(Font)              scaled to size 6.47295pt on input line 61.
+(load cache: extra_lmroman5-regular.luc)
+LaTeX Font Info:    Font shape `JT3/mc/m/n' will be
+(Font)              scaled to size 4.62357pt on input line 61.
 [2]
+
+LaTeX Warning: Reference `fig:unaligned' on page 3 undefined on input line 133.
+
+
+[3] [4]
+LaTeX Font Info:    Font shape `TU/lmtt/bx/n' in size <10> not available
+(Font)              Font shape `TU/lmtt/b/n' tried instead on input line 218.
+(load cache: extra_lmmonolt10-bold.luc)
+LaTeX Font Info:    Font shape `JT3/gt/bx/n' in size <10> not available
+(Font)              Font shape `JT3/gt/m/n' tried instead on input line 218.
 LaTeX Font Info:    Font shape `JT3/gt/m/n' will be
-(Font)              scaled to size 11.09656pt on input line 85.
-(save cache: /Users/dmainf/Library/texlive/2026/texmf-var/luatexja/extra_lmroman
-7-regular.lua.gz)(save cache: /Users/dmainf/Library/texlive/2026/texmf-var/luate
-xja/extra_lmroman7-regular.luc)
-LaTeX Font Info:    Font shape `JT3/mc/m/n' will be
-(Font)              scaled to size 6.47295pt on input line 93.
-(save cache: /Users/dmainf/Library/texlive/2026/texmf-var/luatexja/extra_lmroman
-5-regular.lua.gz)(save cache: /Users/dmainf/Library/texlive/2026/texmf-var/luate
-xja/extra_lmroman5-regular.luc)
-LaTeX Font Info:    Font shape `JT3/mc/m/n' will be
-(Font)              scaled to size 4.62357pt on input line 93.
-(save cache: /Users/dmainf/Library/texlive/2026/texmf-var/luatexja/extra_lmmono1
-0-regular.lua.gz)(save cache: /Users/dmainf/Library/texlive/2026/texmf-var/luate
-xja/extra_lmmono10-regular.luc)(save cache: /Users/dmainf/Library/texlive/2026/t
-exmf-var/luatexja/extra_lmromancaps10-regular.lua.gz)(save cache: /Users/dmainf/
-Library/texlive/2026/texmf-var/luatexja/extra_lmromancaps10-regular.luc)
-LaTeX Font Info:    Font shape `JT3/mc/m/sc' in size <10> not available
-(Font)              Font shape `JT3/mc/m/n' tried instead on input line 118.
-LaTeX Font Info:    Font shape `JT3/mc/m/n' will be
-(Font)              scaled to size 7.70596pt on input line 118.
-LaTeX Font Info:    Font shape `JY3/mc/m/sc' in size <10> not available
-(Font)              Font shape `JY3/mc/m/n' tried instead on input line 118.
-LaTeX Font Info:    Font shape `JY3/mc/m/n' will be
-(Font)              scaled to size 7.70596pt on input line 118.
- [3]
-
-! Package titlesec Error: Entered in horizontal mode.
-
-See the titlesec package documentation for explanation.
-Type  H <return>  for immediate help.
- ...                                              
-                                                  
-l.183 \paragraph{比較実験の構成}
-                                       󿿿
-The <format> argument cannot contain horizontal material
-such as text, \noindent, \makebox, etc.
-
-[4]
-
-! Package titlesec Error: Entered in horizontal mode.
-
-See the titlesec package documentation for explanation.
-Type  H <return>  for immediate help.
- ...                                              
-                                                  
-l.194 ...P (Human Connectome Project) Young Adult}
-                                                  
-The <format> argument cannot contain horizontal material
-such as text, \noindent, \makebox, etc.
-
-
-! Package titlesec Error: Entered in horizontal mode.
-
-See the titlesec package documentation for explanation.
-Type  H <return>  for immediate help.
- ...                                              
-                                                  
-l.202 ...ンコーダ：SwiFT（NeurIPS 2023）}
-                                                  󿿿
-The <format> argument cannot contain horizontal material
-such as text, \noindent, \makebox, etc.
-
-
-LaTeX Warning: `h' float specifier changed to `ht'.
-
-
-! Package titlesec Error: Entered in horizontal mode.
-
-See the titlesec package documentation for explanation.
-Type  H <return>  for immediate help.
- ...                                              
-                                                  
-l.258 \paragraph{Encoder（学習対象）}
-                                           󿿿
-The <format> argument cannot contain horizontal material
-such as text, \noindent, \makebox, etc.
-
-
-! Package titlesec Error: Entered in horizontal mode.
-
-See the titlesec package documentation for explanation.
-Type  H <return>  for immediate help.
- ...                                              
-                                                  
-l.267 ...ベル表現（ウィンドウ平均）}
-                                                  󿿿
-The <format> argument cannot contain horizontal material
-such as text, \noindent, \makebox, etc.
-
-[5]
-
-! Package titlesec Error: Entered in horizontal mode.
-
-See the titlesec package documentation for explanation.
-Type  H <return>  for immediate help.
- ...                                              
-                                                  
-l.272 ...agraph{予測ヘッド（学習対象）}
-                                                  󿿿
-The <format> argument cannot contain horizontal material
-such as text, \noindent, \makebox, etc.
-
-
-Package hyperref Warning: Token not allowed in a PDF string (Unicode):
-(hyperref)                removing `math shift' on input line 282.
-
-
-Package hyperref Warning: Token not allowed in a PDF string (Unicode):
-(hyperref)                removing `math shift' on input line 282.
-
-
-LaTeX Font Warning: Font shape `TU/lmss/m/sc' in size <10> not available
-(Font)              Font shape `TU/lmr/m/sc' tried instead on input line 297.
-
-LaTeX Font Info:    Kanji font shape `JY3/gt/m/sc' undefined
-(Font)              No change on input line 297.
-[6](save cache: /Users/dmainf/Library/texlive/2026/texmf-var/luatexja/extra_lmmo
-no8-regular.lua.gz)(save cache: /Users/dmainf/Library/texlive/2026/texmf-var/lua
-texja/extra_lmmono8-regular.luc) [7] [8] [9] (./research_map.aux)
+(Font)              scaled to size 7.70596pt on input line 218.
+LaTeX Font Info:    Font shape `JY3/gt/bx/n' in size <10> not available
+(Font)              Font shape `JY3/gt/m/n' tried instead on input line 218.
+LaTeX Font Info:    Font shape `JY3/gt/m/n' will be
+(Font)              scaled to size 7.70596pt on input line 218.
+ [5](load cache: extra_lmmono10-regular.luc)(load cache: extra_lmmono8-regular.l
+uc) [6] [7] [8] (./research_map.aux)
  ***********
 LaTeX2e <2025-11-01>
 L3 programming layer <2026-01-19>
  ***********
+
+
+LaTeX Warning: There were undefined references.
+
+
+LaTeX Warning: Label(s) may have changed. Rerun to get cross-references right.
 
 
 Package rerunfilecheck Warning: File `research_map.out' has changed.
@@ -1391,50 +1193,49 @@ Package rerunfilecheck Warning: File `research_map.out' has changed.
 (rerunfilecheck)                or use package `bookmark'.
 
 Package rerunfilecheck Info: Checksums for `research_map.out':
-(rerunfilecheck)             Before: D41D8CD98F00B204E9800998ECF8427E;0
-(rerunfilecheck)             After:  7EE289F382923073C145A37EDD38C386;2098.
+(rerunfilecheck)             Before: <no file>
+(rerunfilecheck)             After:  A3A86ABCCE83487799858B8128AA58ED;1991.
 )
 
 Here is how much of LuaTeX's memory you used:
- 12830 strings out of 476076
- 156562,662416 words of node,token memory allocated
- 2354 words of node memory still in use:
-   11 hlist, 2 vlist, 5 rule, 2 glue, 4 kern, 2 sub_mlist, 1 glyph, 779 attribut
-e, 58 glue_spec, 84 attribute_list, 1 write, 15 user_defined nodes
-   avail lists: 1:30,2:38063,3:365,4:361,5:330,6:48,7:4050,8:84,9:1796,10:20,11:
-27
- 34945 multiletter control sequences out of 65536+600000
- 103 fonts using 70613351 bytes
- 119i,13n,112p,2057b,391s stack positions out of 10000i,1000n,20000p,200000b,200000s
-</usr/local/texlive/2026/texmf-dist/fonts/opentype/public/lm/lmroman5-regular.ot
-f></usr/local/texlive/2026/texmf-dist/fonts/opentype/public/lm/lmromancaps10-reg
-ular.otf></usr/local/texlive/2026/texmf-dist/fonts/opentype/public/lm/lmmono10-r
-egular.otf></usr/local/texlive/2026/texmf-dist/fonts/opentype/public/lm/lmroman7
--regular.otf></usr/local/texlive/2026/texmf-dist/fonts/opentype/public/lm/lmroma
-n10-bold.otf></usr/local/texlive/2026/texmf-dist/fonts/opentype/public/lm/lmsans
-10-regular.otf></usr/local/texlive/2026/texmf-dist/fonts/opentype/public/lm/lmsa
-ns12-regular.otf></usr/local/texlive/2026/texmf-dist/fonts/opentype/public/lm/lm
-roman10-regular.otf></usr/local/texlive/2026/texmf-dist/fonts/opentype/public/ha
-ranoaji/HaranoAjiGothic-Medium.otf></usr/local/texlive/2026/texmf-dist/fonts/ope
-ntype/public/lm/lmroman17-regular.otf></usr/local/texlive/2026/texmf-dist/fonts/
-opentype/public/haranoaji/HaranoAjiMincho-Regular.otf></usr/local/texlive/2026/t
-exmf-dist/fonts/type1/public/amsfonts/cm/cmex10.pfb></usr/local/texlive/2026/tex
-mf-dist/fonts/type1/public/amsfonts/cm/cmmi10.pfb></usr/local/texlive/2026/texmf
--dist/fonts/type1/public/amsfonts/cm/cmmi12.pfb></usr/local/texlive/2026/texmf-d
-ist/fonts/type1/public/amsfonts/cm/cmmi5.pfb></usr/local/texlive/2026/texmf-dist
-/fonts/type1/public/amsfonts/cm/cmmi7.pfb></usr/local/texlive/2026/texmf-dist/fo
-nts/type1/public/amsfonts/cm/cmmib10.pfb></usr/local/texlive/2026/texmf-dist/fon
-ts/type1/public/amsfonts/cmextra/cmmib7.pfb></usr/local/texlive/2026/texmf-dist/
-fonts/type1/public/amsfonts/cm/cmr10.pfb></usr/local/texlive/2026/texmf-dist/fon
-ts/type1/public/amsfonts/cm/cmr7.pfb></usr/local/texlive/2026/texmf-dist/fonts/t
-ype1/public/amsfonts/cm/cmsy10.pfb></usr/local/texlive/2026/texmf-dist/fonts/typ
-e1/public/amsfonts/cm/cmsy5.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/
-public/amsfonts/cm/cmsy7.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/pub
-lic/amsfonts/symbols/msbm10.pfb>
-Output written on research_map.pdf (9 pages, 292426 bytes).
+ 12515 strings out of 476076
+ 125244,662416 words of node,token memory allocated
+ 1869 words of node memory still in use:
+   11 hlist, 2 vlist, 5 rule, 2 glue, 4 kern, 10 sub_mlist, 1 glyph, 548 attribu
+te, 57 glue_spec, 63 attribute_list, 1 write, 15 user_defined nodes
+   avail lists: 1:8,2:34599,3:350,4:509,5:370,6:38,7:3856,8:86,9:1701,10:20,11:2
+9
+ 34652 multiletter control sequences out of 65536+600000
+ 103 fonts using 70608551 bytes
+ 119i,14n,112p,2057b,503s stack positions out of 10000i,1000n,20000p,200000b,200000s
+</usr/local/texlive/2026/texmf-dist/fonts/opentype/public/lm/lmmono10-regular.ot
+f></usr/local/texlive/2026/texmf-dist/fonts/opentype/public/lm/lmmonolt10-bold.o
+tf></usr/local/texlive/2026/texmf-dist/fonts/opentype/public/lm/lmroman5-regular
+.otf></usr/local/texlive/2026/texmf-dist/fonts/opentype/public/lm/lmroman7-regul
+ar.otf></usr/local/texlive/2026/texmf-dist/fonts/opentype/public/lm/lmsans10-reg
+ular.otf></usr/local/texlive/2026/texmf-dist/fonts/opentype/public/lm/lmroman10-
+bold.otf></usr/local/texlive/2026/texmf-dist/fonts/opentype/public/lm/lmsans12-r
+egular.otf></usr/local/texlive/2026/texmf-dist/fonts/opentype/public/lm/lmroman1
+0-regular.otf></usr/local/texlive/2026/texmf-dist/fonts/opentype/public/haranoaj
+i/HaranoAjiGothic-Medium.otf></usr/local/texlive/2026/texmf-dist/fonts/opentype/
+public/lm/lmroman17-regular.otf></usr/local/texlive/2026/texmf-dist/fonts/openty
+pe/public/haranoaji/HaranoAjiMincho-Regular.otf></usr/local/texlive/2026/texmf-d
+ist/fonts/type1/public/amsfonts/cm/cmex10.pfb></usr/local/texlive/2026/texmf-dis
+t/fonts/type1/public/amsfonts/cm/cmmi10.pfb></usr/local/texlive/2026/texmf-dist/
+fonts/type1/public/amsfonts/cm/cmmi5.pfb></usr/local/texlive/2026/texmf-dist/fon
+ts/type1/public/amsfonts/cm/cmmi7.pfb></usr/local/texlive/2026/texmf-dist/fonts/
+type1/public/amsfonts/cm/cmmib10.pfb></usr/local/texlive/2026/texmf-dist/fonts/t
+ype1/public/amsfonts/cmextra/cmmib7.pfb></usr/local/texlive/2026/texmf-dist/font
+s/type1/public/amsfonts/cm/cmr10.pfb></usr/local/texlive/2026/texmf-dist/fonts/t
+ype1/public/amsfonts/cm/cmr7.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1
+/public/amsfonts/cm/cmsy10.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/p
+ublic/amsfonts/cm/cmsy5.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/publ
+ic/amsfonts/cm/cmsy7.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/
+amsfonts/symbols/msbm10.pfb>
+Output written on research_map.pdf (8 pages, 296374 bytes).
 
-PDF statistics: 228 PDF objects out of 1000 (max. 8388607)
- 169 compressed objects within 2 object streams
- 61 named destinations out of 1000 (max. 1048576)
+PDF statistics: 230 PDF objects out of 1000 (max. 8388607)
+ 173 compressed objects within 2 object streams
+ 69 named destinations out of 1000 (max. 1048576)
  1 words of extra memory for PDF output out of 10000 (max. 100000000)
 
