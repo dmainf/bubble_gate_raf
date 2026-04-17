@@ -8,11 +8,7 @@ class BubbleManager:
 
     サーバーが全クライアントの h = encoder(z).mean(0) を直接観測できる前提．
 
-    バブル判定の基盤：
-      各バブルの代表点 c_B = mean({ h_i | i ∈ B }) を管理し，
-      コサイン距離でクラスタを分割・結合する．
-
-    split_threshold: バブル内の最大コサイン距離がこの値を超えたら分割
+    split_threshold: バブル内プロトタイプ平均コサイン距離がこの値を超えたら分割
     merge_threshold: バブル間プロトタイプのコサイン距離がこの値以下なら結合
     """
 
@@ -22,6 +18,27 @@ class BubbleManager:
         self.bubbles = {0: set(client_ids)}
         self.client_to_bubble = {c: 0 for c in client_ids}
         self._next_id = 1
+
+    def initialize_random(self, n_init, seed=42):
+        """全被験者をランダムに n_init バブルへ初期割り当てする.
+
+        全員が1バブルで開始すると Round 5 の最初の Split まで L_con が
+        計算されないため，Round 0 でこのメソッドを呼び出して L_con を
+        最初から有効にする.
+        """
+        import random
+        rng = random.Random(seed)
+        all_clients = list(next(iter(self.bubbles.values())))
+        rng.shuffle(all_clients)
+        n_init = min(n_init, len(all_clients))
+
+        self.bubbles = {}
+        self.client_to_bubble = {}
+        for i, client in enumerate(all_clients):
+            bid = i % n_init
+            self.bubbles.setdefault(bid, set()).add(client)
+            self.client_to_bubble[client] = bid
+        self._next_id = n_init
 
     @property
     def n_bubbles(self):
@@ -88,10 +105,10 @@ class BubbleManager:
         self.bubbles = {bid: clients for bid, clients in new_bubbles.items() if clients}
 
     def split_bubbles(self, h_subject, min_size=1):
-        """バブル内の最大コサイン距離が split_threshold を超えたら2分割
+        """プロトタイプ平均コサイン距離が split_threshold を超えたら2分割
 
-        min_size: 分割後の各グループの最小メンバー数．
-                  どちらかのグループが min_size 未満になる場合は分割しない．
+        min_size: 分割後の各グループの最小メンバー数（Phase 2 の top-k 検索のため
+                  min_size = top_k + 1 を推奨）．
         """
         new_bubbles = {}
         new_assignments = {}
@@ -105,9 +122,12 @@ class BubbleManager:
                 continue
 
             vecs = F.normalize(torch.stack([h_subject[c] for c in active]), dim=1)
-            dist = 1 - vecs @ vecs.T  # コサイン距離行列 (n, n)
+            proto = F.normalize(vecs.mean(0, keepdim=True), dim=1)
+            d_avg = (1 - (vecs @ proto.T).squeeze(1)).mean().item()
 
-            if dist.triu(diagonal=1).max().item() <= self.split_threshold:
+            dist = 1 - vecs @ vecs.T
+
+            if d_avg <= self.split_threshold:
                 new_bubbles[bid] = clients
                 for c in clients:
                     new_assignments[c] = bid
@@ -155,17 +175,16 @@ class BubbleManager:
             del self.bubbles[src]
 
     def intra_dist_per_bubble(self, h_subject):
-        """バブルごとの平均ペアコサイン距離 {bid: float}"""
+        """バブルごとのプロトタイプ平均コサイン距離 {bid: float}（split判定と同一指標）"""
         result = {}
         for bid, clients in self.bubbles.items():
             active = [c for c in clients if c in h_subject]
-            if len(active) < 2:
+            if not active:
                 result[bid] = 0.0
                 continue
             vecs = F.normalize(torch.stack([h_subject[c] for c in active]), dim=1)
-            dist = 1 - vecs @ vecs.T
-            n = len(active)
-            result[bid] = float(dist.triu(diagonal=1).sum() / (n * (n - 1) / 2))
+            proto = F.normalize(vecs.mean(0, keepdim=True), dim=1)
+            result[bid] = float((1 - (vecs @ proto.T).squeeze(1)).mean())
         return result
 
     def _bipartition(self, clients, dist_matrix):

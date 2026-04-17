@@ -13,22 +13,33 @@ import sys
 import json
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
+import random
 import numpy as np
 from pathlib import Path
 
 sys.stdout.reconfigure(line_buffering=True)
+
+SEED = 42
+random.seed(SEED)
+np.random.seed(SEED)
+torch.manual_seed(SEED)
+if torch.cuda.is_available():
+    torch.cuda.manual_seed_all(SEED)
+if torch.backends.mps.is_available():
+    torch.mps.manual_seed(SEED)
 sys.path.insert(0, str(Path(__file__).parent))
 
 from dataset import HCPWMLatentDataset, compute_label_stats
-from client_model import ClientModel
+from client_model import ClientModel, GateRAFModel
 from bubble_manager import BubbleManager
 
 
 DATA_DIR = Path(__file__).parent / "data"
-N_ROUNDS = 60
+N_ROUNDS = 30
 LOCAL_EPOCHS = 2
 LR = 1e-3
 LAMBDA_CON = 0.5
@@ -36,10 +47,12 @@ TEMPERATURE = 0.1
 SPLIT_EVERY = 5
 MERGE_EVERY = 10
 REASSIGN_EVERY = 3
-SPLIT_THRESHOLD = 0.12   # バブル内の最大コサイン距離がこれを超えたら分割
+SPLIT_THRESHOLD = 0.05   # バブル内プロトタイプ平均コサイン距離がこれを超えたら分割
 MERGE_THRESHOLD = 0.05   # バブル間プロトタイプのコサイン距離がこれ以下なら統合
 ANNEALING_RATE = 1.15    # 分割のたびに閾値を拡大（過分割を抑制）
-MIN_SPLIT_SIZE = 5       # 分割後の最小バブルサイズ
+TOP_K = 5                # Phase 2 メモリバンク top-k 件数
+MIN_SPLIT_SIZE = TOP_K + 2  # 分割後の最小バブルサイズ: |B| > k+1 を保証（tex 条件と一致）
+N_INIT_BUBBLES = 4      # Round 0 で L_con を有効にするための初期バブル数
 
 
 def get_subject_ids():
@@ -57,16 +70,23 @@ def get_device():
 def prepare_data(device):
     subject_ids = get_subject_ids()
     n_train = int(len(subject_ids) * 0.8)
-    label_stats = compute_label_stats(subject_ids[:n_train])
+    train_ids = subject_ids[:n_train]
+    test_ids  = subject_ids[n_train:]
+    label_stats = compute_label_stats(train_ids)
 
-    subject_datasets = {}
-    for sub in subject_ids:
+    train_datasets = {}
+    for sub in train_ids:
         ds = HCPWMLatentDataset([sub], label_stats=label_stats)
         if len(ds) > 0:
-            subject_datasets[sub] = ds
+            train_datasets[sub] = ds
 
-    client_ids = list(subject_datasets.keys())
-    return subject_ids, label_stats, subject_datasets, client_ids
+    test_datasets = {}
+    for sub in test_ids:
+        ds = HCPWMLatentDataset([sub], label_stats=label_stats)
+        if len(ds) > 0:
+            test_datasets[sub] = ds
+
+    return train_ids, test_ids, label_stats, train_datasets, test_datasets
 
 
 def load_all_tensors(subject_datasets, device):
@@ -212,13 +232,97 @@ def save_figures(data_dir, figures_dir):
     print(f"  figures → {figures_dir}")
 
 
+def save_phase2_figures(data_dir, figures_dir):
+    figures_dir = Path(figures_dir)
+    figures_dir.mkdir(exist_ok=True)
+
+    with open(data_dir / "loss_history.json") as f:
+        loss_history = json.load(f)
+    with open(data_dir / "train_predictions.json") as f:
+        train_preds = json.load(f)
+    test_preds = []
+    test_path = data_dir / "test_predictions.json"
+    if test_path.exists():
+        with open(test_path) as f:
+            test_preds = json.load(f)
+
+    # 1. 学習損失曲線
+    fig, ax = plt.subplots(figsize=(8, 4))
+    ax.plot(range(1, len(loss_history) + 1), loss_history,
+            color="steelblue", linewidth=1.5, marker="o", markersize=3)
+    ax.set_xlabel("Epoch")
+    ax.set_ylabel("MSE loss (standardized)")
+    ax.set_title("Phase 2: Training loss")
+    plt.tight_layout()
+    plt.savefig(figures_dir / "phase2_loss.png", dpi=150)
+    plt.close()
+
+    # 2. Gate 値分布（訓練 vs テスト）
+    fig, ax = plt.subplots(figsize=(7, 4))
+    tr_gates = [p["gate_value"] for p in train_preds]
+    ax.hist(tr_gates, bins=20, alpha=0.7, color="steelblue", label=f"Train (n={len(tr_gates)})")
+    if test_preds:
+        te_gates = [p["gate_value"] for p in test_preds]
+        ax.hist(te_gates, bins=20, alpha=0.7, color="tomato", label=f"Test (n={len(te_gates)})")
+    ax.set_xlabel("Gate value g")
+    ax.set_ylabel("Count")
+    ax.set_title("Phase 2: Gate value distribution")
+    ax.legend()
+    plt.tight_layout()
+    plt.savefig(figures_dir / "phase2_gate_dist.png", dpi=150)
+    plt.close()
+
+    # 3. 予測精度散布図 (acc)
+    fig, ax = plt.subplots(figsize=(6, 6))
+    tr_true_acc = [p["true_acc"] for p in train_preds]
+    tr_pred_acc = [p["pred_acc"] for p in train_preds]
+    ax.scatter(tr_true_acc, tr_pred_acc, s=30, alpha=0.6, color="steelblue", label="Train")
+    if test_preds:
+        te_true_acc = [p["true_acc"] for p in test_preds]
+        te_pred_acc = [p["pred_acc"] for p in test_preds]
+        ax.scatter(te_true_acc, te_pred_acc, s=40, alpha=0.8, color="tomato", marker="^", label="Test")
+    lim = [min(tr_true_acc + [p["true_acc"] for p in test_preds]), max(tr_true_acc + [p["true_acc"] for p in test_preds])]
+    ax.plot(lim, lim, "k--", linewidth=1)
+    ax.set_xlabel("True acc")
+    ax.set_ylabel("Pred acc")
+    ax.set_title("Phase 2: Accuracy prediction")
+    ax.legend()
+    plt.tight_layout()
+    plt.savefig(figures_dir / "phase2_pred_acc.png", dpi=150)
+    plt.close()
+
+    # 4. 予測精度散布図 (RT)
+    fig, ax = plt.subplots(figsize=(6, 6))
+    tr_true_rt = [p["true_rt"] for p in train_preds]
+    tr_pred_rt = [p["pred_rt"] for p in train_preds]
+    ax.scatter(tr_true_rt, tr_pred_rt, s=30, alpha=0.6, color="steelblue", label="Train")
+    if test_preds:
+        te_true_rt = [p["true_rt"] for p in test_preds]
+        te_pred_rt = [p["pred_rt"] for p in test_preds]
+        ax.scatter(te_true_rt, te_pred_rt, s=40, alpha=0.8, color="tomato", marker="^", label="Test")
+    all_rt = tr_true_rt + [p["true_rt"] for p in test_preds]
+    lim_rt = [min(all_rt), max(all_rt)]
+    ax.plot(lim_rt, lim_rt, "k--", linewidth=1)
+    ax.set_xlabel("True RT (ms)")
+    ax.set_ylabel("Pred RT (ms)")
+    ax.set_title("Phase 2: RT prediction")
+    ax.legend()
+    plt.tight_layout()
+    plt.savefig(figures_dir / "phase2_pred_rt.png", dpi=150)
+    plt.close()
+
+    print(f"  figures → {figures_dir}")
+
+
 def run(subject_datasets, client_ids, label_stats, results_dir,
         split_threshold=SPLIT_THRESHOLD, merge_threshold=MERGE_THRESHOLD,
         lambda_con=LAMBDA_CON, temperature=TEMPERATURE,
         n_rounds=N_ROUNDS, local_epochs=LOCAL_EPOCHS, lr=LR,
-        verbose=True):
+        n_init_bubbles=N_INIT_BUBBLES, verbose=True):
     """
-    対照学習付きバブル型クラスタ学習の1実験を実行して結果を保存する．
+    Phase 1: 対照学習付きバブル型クラスタ学習の1実験を実行して結果を保存する．
+
+    subject_datasets / client_ids は訓練被験者のみを渡すこと（データリーク防止）．
 
     Returns:
         dict: {n_final_bubbles, final_loss, n_splits, n_merges}
@@ -238,6 +342,7 @@ def run(subject_datasets, client_ids, label_stats, results_dir,
     server = BubbleManager(client_ids,
                            split_threshold=split_threshold,
                            merge_threshold=merge_threshold)
+    server.initialize_random(n_init_bubbles)
 
     loss_history = {sid: [] for sid in client_ids}
     bubble_history = []
@@ -374,7 +479,7 @@ def run(subject_datasets, client_ids, label_stats, results_dir,
         for bid, members in final_bubbles.items():
             accs = [m["acc_2bk"] for m in members if m["acc_2bk"] is not None]
             rts  = [m["rt_2bk"]  for m in members if m["rt_2bk"]  is not None]
-            if accs:
+            if accs and rts:
                 print(f"  Bubble {bid} ({len(members)} clients): acc={sum(accs)/len(accs):.3f}, rt={sum(rts)/len(rts):.0f}ms")
 
     return {
@@ -385,22 +490,265 @@ def run(subject_datasets, client_ids, label_stats, results_dir,
     }
 
 
+def evaluate_phase1_on_test(test_datasets, label_stats, phase1_dir, device=None):
+    """Phase 1 の encoder+head でテスト被験者を評価する（比較実験 条件C 用）.
+
+    GateRAF を使わずに Phase 1 モデルをそのまま test に適用する．
+    各被験者の全ウィンドウ予測を平均して subject-level 予測とする．
+
+    Returns:
+        list[dict]: per-subject 予測結果
+    """
+    if device is None:
+        device = get_device()
+    model = ClientModel().to(device)
+    model.load_state_dict(
+        torch.load(Path(phase1_dir) / "data" / "model.pt", map_location=device, weights_only=True)
+    )
+    model.eval()
+    test_data = load_all_tensors(test_datasets, device)
+    predictions = []
+    with torch.no_grad():
+        for sid in test_data:
+            h = model.encode(test_data[sid]["z"])
+            pred = model.head(h).mean(0)
+            label = test_data[sid]["labels"][0]
+            predictions.append({
+                "subject": sid,
+                "pred_acc": float(pred[0] * label_stats["acc_std"] + label_stats["acc_mean"]),
+                "pred_rt":  float(pred[1] * label_stats["rt_std"]  + label_stats["rt_mean"]),
+                "true_acc": float(label[0] * label_stats["acc_std"] + label_stats["acc_mean"]),
+                "true_rt":  float(label[1] * label_stats["rt_std"]  + label_stats["rt_mean"]),
+            })
+    return predictions
+
+
+def run_phase2(subject_datasets, client_ids, label_stats, results_dir,
+               phase1_dir=None, test_datasets=None, top_k=TOP_K, n_epochs=50, lr=1e-3, verbose=True):
+    """
+    Phase 2: GateRAF 学習 + テスト評価
+
+    Phase 1 の encoder を凍結したままメモリバンクを構築し，
+    Gate 層と予測ヘッドのみをタスク損失で最適化する．
+    メモリバンクは訓練被験者のみで構築するため，
+    subject_datasets / client_ids には訓練被験者のみを渡すこと．
+
+    テスト被験者（test_datasets）は最近傍バブル割り当て後に GateRAF で予測する：
+      1. frozen encoder で h_bar_test を計算
+      2. 訓練バブルのプロトタイプに最近傍割り当て
+      3. 割り当てバブルの訓練被験者から top-k 検索
+      4. GateRAF で予測
+
+    エンコーダ凍結の根拠：encoder を更新するとクエリと
+    メモリバンクの表現空間がずれ（表現ドリフト），コサイン類似度検索が無効化される．
+    表現力の向上が必要な場合は Momentum Encoder（m ≈ 0.99）への移行を検討する．
+
+    Returns:
+        dict: {final_loss, gate_mean, test_mse_acc, test_mse_rt}
+    """
+    results_dir = Path(results_dir)
+    results_dir.mkdir(parents=True, exist_ok=True)
+    device = get_device()
+
+    torch.manual_seed(SEED)
+    np.random.seed(SEED)
+
+    if phase1_dir is None:
+        raise ValueError("phase1_dir must be specified (path to Phase 1 results directory)")
+    phase1_data_dir = Path(phase1_dir) / "data"
+
+    phase1_model = ClientModel().to(device)
+    phase1_model.load_state_dict(
+        torch.load(phase1_data_dir / "model.pt", map_location=device, weights_only=True)
+    )
+    phase1_model.eval()
+    for p in phase1_model.parameters():
+        p.requires_grad_(False)
+
+    with open(phase1_data_dir / "final_bubbles.json") as f:
+        final_bubbles_raw = json.load(f)
+
+    all_data = load_all_tensors(subject_datasets, device)
+    memory_bank = compute_h_subject(phase1_model, all_data)
+
+    sid_to_bubble = {}
+    for bid, members in final_bubbles_raw.items():
+        for m in members:
+            if m["subject"] in {s for s in client_ids}:
+                sid_to_bubble[m["subject"]] = bid
+
+    bubble_to_sids = {}
+    for sid, bid in sid_to_bubble.items():
+        bubble_to_sids.setdefault(bid, []).append(sid)
+
+    @torch.no_grad()
+    def compute_h_ret(sid):
+        bid = sid_to_bubble.get(sid)
+        if bid is None:
+            return torch.zeros(128, device=device)
+        candidates = [s for s in bubble_to_sids.get(bid, []) if s != sid and s in memory_bank]
+        # tex 条件: |B| > k+1 のときのみ参照を使う（= candidates が top_k+1 件以上）
+        if len(candidates) <= top_k:
+            return torch.zeros(128, device=device)
+        h_q_norm = F.normalize(memory_bank[sid].unsqueeze(0), dim=1)
+        cands_norm = F.normalize(torch.stack([memory_bank[s] for s in candidates]), dim=1)
+        sims = (h_q_norm @ cands_norm.T).squeeze(0)
+        top_idx = sims.topk(top_k).indices.tolist()
+        return torch.stack([memory_bank[candidates[i]] for i in top_idx]).mean(0)
+
+    h_q_all   = {sid: memory_bank[sid].detach() for sid in client_ids}
+    h_ret_all = {sid: compute_h_ret(sid)        for sid in client_ids}
+    labels_all = {sid: all_data[sid]["labels"][0] for sid in client_ids}
+
+    gate_model = GateRAFModel().to(device)
+    optimizer = torch.optim.Adam(gate_model.parameters(), lr=lr)
+    criterion = nn.MSELoss()
+    loss_history = []
+
+    for epoch in range(n_epochs):
+        gate_model.train()
+        h_q_stack   = torch.stack([h_q_all[s]   for s in client_ids])
+        h_ret_stack = torch.stack([h_ret_all[s]  for s in client_ids])
+        y_stack     = torch.stack([labels_all[s] for s in client_ids])
+
+        pred, g = gate_model(h_q_stack, h_ret_stack)
+        loss = criterion(pred, y_stack)
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+
+        loss_history.append(loss.item())
+        if verbose and (epoch + 1) % 10 == 0:
+            print(f"  [Phase2] Epoch {epoch+1}/{n_epochs}  loss={loss.item():.4f}  gate_mean={g.mean().item():.3f}")
+
+    gate_model.eval()
+    with torch.no_grad():
+        h_q_stack   = torch.stack([h_q_all[s]   for s in client_ids])
+        h_ret_stack = torch.stack([h_ret_all[s]  for s in client_ids])
+        y_stack     = torch.stack([labels_all[s] for s in client_ids])
+        pred_stack, g_stack = gate_model(h_q_stack, h_ret_stack)
+
+    predictions = []
+    for i, sid in enumerate(client_ids):
+        predictions.append({
+            "subject": sid,
+            "bubble": sid_to_bubble.get(sid, -1),
+            "gate_value": float(g_stack[i, 0]),
+            "pred_acc": float(pred_stack[i, 0] * label_stats["acc_std"] + label_stats["acc_mean"]),
+            "pred_rt":  float(pred_stack[i, 1] * label_stats["rt_std"]  + label_stats["rt_mean"]),
+            "true_acc": float(y_stack[i, 0] * label_stats["acc_std"] + label_stats["acc_mean"]),
+            "true_rt":  float(y_stack[i, 1] * label_stats["rt_std"]  + label_stats["rt_mean"]),
+        })
+
+    # テスト被験者の推論
+    # 1. frozen encoder で h_bar_test を計算
+    # 2. 訓練バブルのプロトタイプへ最近傍割り当て
+    # 3. 割り当てバブルの訓練被験者から top-k 検索
+    # 4. GateRAF で予測
+    test_predictions = []
+    if test_datasets:
+        test_data = load_all_tensors(test_datasets, device)
+        test_sids = list(test_data.keys())
+
+        train_bubble_ids = sorted(bubble_to_sids.keys())
+        proto_vecs = torch.stack([
+            F.normalize(
+                torch.stack([memory_bank[s] for s in bubble_to_sids[bid]]).mean(0, keepdim=True),
+                dim=1,
+            ).squeeze(0)
+            for bid in train_bubble_ids
+        ])  # (K, 128)
+
+        @torch.no_grad()
+        def infer_test(sid):
+            h_bar = phase1_model.encode(test_data[sid]["z"]).mean(0)
+            h_bar_norm = F.normalize(h_bar.unsqueeze(0), dim=1)
+            nearest_idx = (h_bar_norm @ proto_vecs.T).squeeze(0).argmax().item()
+            assigned_bid = train_bubble_ids[nearest_idx]
+            candidates = [s for s in bubble_to_sids[assigned_bid] if s in memory_bank]
+            if len(candidates) > top_k:  # |B| > k+1（tex 条件と一致）
+                cands_norm = F.normalize(torch.stack([memory_bank[s] for s in candidates]), dim=1)
+                sims = (h_bar_norm @ cands_norm.T).squeeze(0)
+                top_idx = sims.topk(top_k).indices.tolist()
+                h_ret = torch.stack([memory_bank[candidates[i]] for i in top_idx]).mean(0)
+            else:
+                h_ret = torch.zeros(128, device=device)
+            pred, g = gate_model(h_bar.unsqueeze(0), h_ret.unsqueeze(0))
+            label = test_data[sid]["labels"][0]
+            return pred.squeeze(0), g.squeeze(0), label, assigned_bid
+
+        gate_model.eval()
+        for sid in test_sids:
+            pred_t, g_t, label_t, bid = infer_test(sid)
+            test_predictions.append({
+                "subject": sid,
+                "assigned_bubble": bid,
+                "gate_value": float(g_t[0]),
+                "pred_acc": float(pred_t[0] * label_stats["acc_std"] + label_stats["acc_mean"]),
+                "pred_rt":  float(pred_t[1] * label_stats["rt_std"]  + label_stats["rt_mean"]),
+                "true_acc": float(label_t[0] * label_stats["acc_std"] + label_stats["acc_mean"]),
+                "true_rt":  float(label_t[1] * label_stats["rt_std"]  + label_stats["rt_mean"]),
+            })
+
+    data_dir = results_dir / "data"
+    data_dir.mkdir(parents=True, exist_ok=True)
+    torch.save(gate_model.state_dict(), data_dir / "gate_model.pt")
+    with open(data_dir / "train_predictions.json", "w") as f:
+        json.dump(predictions, f, indent=2)
+    with open(data_dir / "test_predictions.json", "w") as f:
+        json.dump(test_predictions, f, indent=2)
+    with open(data_dir / "loss_history.json", "w") as f:
+        json.dump(loss_history, f, indent=2)
+
+    save_phase2_figures(data_dir, results_dir)
+
+    gate_mean = sum(p["gate_value"] for p in predictions) / len(predictions)
+    result = {"final_loss": loss_history[-1], "gate_mean": gate_mean}
+
+    if verbose:
+        tr_mse_acc = sum((p["pred_acc"] - p["true_acc"]) ** 2 for p in predictions) / len(predictions)
+        tr_mse_rt  = sum((p["pred_rt"]  - p["true_rt"])  ** 2 for p in predictions) / len(predictions)
+        print(f"\n=== Phase 2 complete ===")
+        print(f"  Train  MSE  acc={tr_mse_acc:.4f}, RT={tr_mse_rt:.1f} ms²  gate_mean={gate_mean:.3f}")
+        if test_predictions:
+            te_mse_acc = sum((p["pred_acc"] - p["true_acc"]) ** 2 for p in test_predictions) / len(test_predictions)
+            te_mse_rt  = sum((p["pred_rt"]  - p["true_rt"])  ** 2 for p in test_predictions) / len(test_predictions)
+            print(f"  Test   MSE  acc={te_mse_acc:.4f}, RT={te_mse_rt:.1f} ms²")
+            result["test_mse_acc"] = te_mse_acc
+            result["test_mse_rt"]  = te_mse_rt
+
+    return result
+
+
 def main():
     device = get_device()
     print(f"Device: {device}")
 
-    subject_ids, label_stats, subject_datasets, client_ids = prepare_data(device)
-    print(f"Found subjects: {len(subject_ids)}, Active clients: {len(client_ids)}")
-    if not client_ids:
+    train_ids, test_ids, label_stats, train_datasets, test_datasets = prepare_data(device)
+    train_client_ids = list(train_datasets.keys())
+    print(f"Train: {len(train_client_ids)}, Test: {len(test_datasets)}")
+    if not train_client_ids:
         print("No active clients. Run precompute.py first.")
         return
 
     print(f"Label stats (train only): acc={label_stats['acc_mean']:.3f}±{label_stats['acc_std']:.3f}, "
           f"rt={label_stats['rt_mean']:.1f}±{label_stats['rt_std']:.1f}ms")
 
-    run(subject_datasets, client_ids, label_stats,
-        results_dir=Path(__file__).parent / "results",
+    results_dir = Path(__file__).parent / "results"
+    phase1_dir  = results_dir / "phase1"
+    phase2_dir  = results_dir / "phase2"
+
+    run(train_datasets, train_client_ids, label_stats,
+        results_dir=phase1_dir,
         verbose=True)
+
+    print("\n--- Starting Phase 2: GateRAF ---")
+    run_phase2(train_datasets, train_client_ids, label_stats,
+               results_dir=phase2_dir,
+               phase1_dir=phase1_dir,
+               test_datasets=test_datasets,
+               top_k=TOP_K,
+               verbose=True)
 
 
 if __name__ == "__main__":

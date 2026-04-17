@@ -1,0 +1,29 @@
+[
+  {
+    "label": "GateRAF_only",
+    "lambda_con": 0.0,
+    "phase2": true,
+    "train_mse_acc": 0.0060306340364383055,
+    "train_mse_rt": 14473.448045946323,
+    "test_mse_acc": 0.014484594301780788,
+    "test_mse_rt": 34100.35464040988
+  },
+  {
+    "label": "Contrastive+RAF",
+    "lambda_con": 0.5,
+    "phase2": true,
+    "train_mse_acc": 0.0057716858256739376,
+    "train_mse_rt": 13845.593295502405,
+    "test_mse_acc": 0.015616988250316174,
+    "test_mse_rt": 34516.23534306192
+  },
+  {
+    "label": "Contrastive_only",
+    "lambda_con": 0.5,
+    "phase2": false,
+    "train_mse_acc": 0.005951930048259079,
+    "train_mse_rt": 14042.328238119082,
+    "test_mse_acc": 0.014544339452116549,
+    "test_mse_rt": 33472.29437109669
+  }
+]

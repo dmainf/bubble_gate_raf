@@ -1,4 +1,4 @@
-This is LuaHBTeX, Version 1.24.0 (TeX Live 2026)  (format=lualatex 2026.3.30)  14 APR 2026 20:24
+This is LuaHBTeX, Version 1.24.0 (TeX Live 2026)  (format=lualatex 2026.3.30)  17 APR 2026 09:55
  restricted system commands enabled.
 **research_map.tex
 (./research_map.tex
@@ -980,9 +980,9 @@ Package: enumitem 2025/02/06 v3.11 Customized lists
 )
 Package hyperref Info: Option `colorlinks' set `true' on input line 12.
 
-No file research_map.aux.
-
+(./research_map.aux)
 \openout1 = research_map.aux
+
 LaTeX Font Info:    Checking defaults for OML/cmm/m/it on input line 19.
 LaTeX Font Info:    ... okay on input line 19.
 LaTeX Font Info:    Checking defaults for OMS/cmsy/m/n on input line 19.
@@ -1007,6 +1007,7 @@ LaTeX Font Info:    Checking defaults for PD1/pdf/m/n on input line 19.
 LaTeX Font Info:    ... okay on input line 19.
 LaTeX Font Info:    Checking defaults for PU/pdf/m/n on input line 19.
 LaTeX Font Info:    ... okay on input line 19.
+
 *geometry* driver: auto-detecting
 *geometry* detected driver: luatex
 *geometry* verbose mode - [ preamble ] result:
@@ -1067,6 +1068,8 @@ File: luatex.def 2025/09/29 v1.2f Graphics/color driver for luatex
 \everyMPtoPDFconversion=\toks43
 )) (/usr/local/texlive/2026/texmf-dist/tex/latex/graphics/mathcolor.ltx))
 Package hyperref Info: Link coloring ON on input line 19.
+
+(./research_map.out) (./research_map.out)
 \@outlinefile=\write3
 
 \openout3 = research_map.out
@@ -1119,11 +1122,22 @@ LaTeX Font Info:    Font shape `JT3/gt/m/n' will be
 LaTeX Font Info:    Font shape `JY3/gt/m/n' will be
 (Font)              scaled to size 13.31586pt on input line 21.
 (load cache: extra_lmsans12-regular.luc)
-No file research_map.toc.
+(./research_map.toc
+LaTeX Font Info:    Calculating math sizes for size <11.99997> on input line 2.
+
+LaTeX Font Info:    Font shape `JY3/mc/m/n' will be
+(Font)              scaled to size 6.47295pt on input line 2.
+LaTeX Font Info:    Font shape `JY3/mc/m/n' will be
+(Font)              scaled to size 4.62357pt on input line 2.
+LaTeX Font Info:    Font shape `JY3/gt/m/n' will be
+(Font)              scaled to size 6.47295pt on input line 2.
+LaTeX Font Info:    Font shape `JY3/gt/m/n' will be
+(Font)              scaled to size 4.62357pt on input line 2.
+)
 \tf@toc=\write4
 
 \openout4 = research_map.toc
-[1
+ [1
 
 {/usr/local/texlive/2026/texmf-var/fonts/map/pdftex/updmap/pdftex.map}]
 LaTeX Font Info:    Font shape `JT3/gt/m/n' will be
@@ -1141,16 +1155,6 @@ LaTeX Font Info:    Font shape `JY3/gt/m/n' will be
 
 LaTeX Warning: Reference `fig:spike' on page 2 undefined on input line 40.
 
-LaTeX Font Info:    Calculating math sizes for size <11.99997> on input line 61
-.
-LaTeX Font Info:    Font shape `JY3/mc/m/n' will be
-(Font)              scaled to size 6.47295pt on input line 61.
-LaTeX Font Info:    Font shape `JY3/mc/m/n' will be
-(Font)              scaled to size 4.62357pt on input line 61.
-LaTeX Font Info:    Font shape `JY3/gt/m/n' will be
-(Font)              scaled to size 6.47295pt on input line 61.
-LaTeX Font Info:    Font shape `JY3/gt/m/n' will be
-(Font)              scaled to size 4.62357pt on input line 61.
 (load cache: extra_lmroman7-regular.luc)
 LaTeX Font Info:    Font shape `JT3/mc/m/n' will be
 (Font)              scaled to size 6.47295pt on input line 61.
@@ -1159,23 +1163,26 @@ LaTeX Font Info:    Font shape `JT3/mc/m/n' will be
 (Font)              scaled to size 4.62357pt on input line 61.
 [2]
 
-LaTeX Warning: Reference `fig:unaligned' on page 3 undefined on input line 133.
+LaTeX Warning: Reference `fig:unaligned' on page 3 undefined on input line 150.
 
 
-[3] [4]
+[3]
+
+LaTeX Warning: `h' float specifier changed to `ht'.
+
 LaTeX Font Info:    Font shape `TU/lmtt/bx/n' in size <10> not available
-(Font)              Font shape `TU/lmtt/b/n' tried instead on input line 218.
+(Font)              Font shape `TU/lmtt/b/n' tried instead on input line 239.
 (load cache: extra_lmmonolt10-bold.luc)
 LaTeX Font Info:    Font shape `JT3/gt/bx/n' in size <10> not available
-(Font)              Font shape `JT3/gt/m/n' tried instead on input line 218.
+(Font)              Font shape `JT3/gt/m/n' tried instead on input line 239.
 LaTeX Font Info:    Font shape `JT3/gt/m/n' will be
-(Font)              scaled to size 7.70596pt on input line 218.
+(Font)              scaled to size 7.70596pt on input line 239.
 LaTeX Font Info:    Font shape `JY3/gt/bx/n' in size <10> not available
-(Font)              Font shape `JY3/gt/m/n' tried instead on input line 218.
+(Font)              Font shape `JY3/gt/m/n' tried instead on input line 239.
 LaTeX Font Info:    Font shape `JY3/gt/m/n' will be
-(Font)              scaled to size 7.70596pt on input line 218.
- [5](load cache: extra_lmmono10-regular.luc)(load cache: extra_lmmono8-regular.l
-uc) [6] [7] [8] (./research_map.aux)
+(Font)              scaled to size 7.70596pt on input line 239.
+[4] [5](load cache: extra_lmmono10-regular.luc)(load cache: extra_lmmono8-regula
+r.luc) [6] [7] [8] [9] (./research_map.aux)
  ***********
 LaTeX2e <2025-11-01>
 L3 programming layer <2026-01-19>
@@ -1187,55 +1194,50 @@ LaTeX Warning: There were undefined references.
 
 LaTeX Warning: Label(s) may have changed. Rerun to get cross-references right.
 
-
-Package rerunfilecheck Warning: File `research_map.out' has changed.
-(rerunfilecheck)                Rerun to get outlines right
-(rerunfilecheck)                or use package `bookmark'.
-
-Package rerunfilecheck Info: Checksums for `research_map.out':
-(rerunfilecheck)             Before: <no file>
-(rerunfilecheck)             After:  A3A86ABCCE83487799858B8128AA58ED;1991.
+Package rerunfilecheck Info: File `research_map.out' has not changed.
+(rerunfilecheck)             Checksum: A3A86ABCCE83487799858B8128AA58ED;1991.
 )
 
 Here is how much of LuaTeX's memory you used:
- 12515 strings out of 476076
+ 12562 strings out of 476076
  125244,662416 words of node,token memory allocated
- 1869 words of node memory still in use:
-   11 hlist, 2 vlist, 5 rule, 2 glue, 4 kern, 10 sub_mlist, 1 glyph, 548 attribu
-te, 57 glue_spec, 63 attribute_list, 1 write, 15 user_defined nodes
-   avail lists: 1:8,2:34599,3:350,4:509,5:370,6:38,7:3856,8:86,9:1701,10:20,11:2
-9
- 34652 multiletter control sequences out of 65536+600000
+ 1970 words of node memory still in use:
+   10 hlist, 2 vlist, 5 rule, 2 glue, 4 kern, 10 sub_mlist, 1 glyph, 601 attribu
+te, 57 glue_spec, 67 attribute_list, 1 write, 14 user_defined nodes
+   avail lists: 1:12,2:35966,3:362,4:489,5:292,6:73,7:4134,8:85,9:1698,10:20,11:
+28
+ 34675 multiletter control sequences out of 65536+600000
  103 fonts using 70608551 bytes
- 119i,14n,112p,2057b,503s stack positions out of 10000i,1000n,20000p,200000b,200000s
+ 119i,17n,112p,2057b,503s stack positions out of 10000i,1000n,20000p,200000b,200000s
 </usr/local/texlive/2026/texmf-dist/fonts/opentype/public/lm/lmmono10-regular.ot
 f></usr/local/texlive/2026/texmf-dist/fonts/opentype/public/lm/lmmonolt10-bold.o
 tf></usr/local/texlive/2026/texmf-dist/fonts/opentype/public/lm/lmroman5-regular
 .otf></usr/local/texlive/2026/texmf-dist/fonts/opentype/public/lm/lmroman7-regul
-ar.otf></usr/local/texlive/2026/texmf-dist/fonts/opentype/public/lm/lmsans10-reg
+ar.otf></usr/local/texlive/2026/texmf-dist/fonts/opentype/public/lm/lmroman10-bo
+ld.otf></usr/local/texlive/2026/texmf-dist/fonts/opentype/public/lm/lmsans12-reg
 ular.otf></usr/local/texlive/2026/texmf-dist/fonts/opentype/public/lm/lmroman10-
-bold.otf></usr/local/texlive/2026/texmf-dist/fonts/opentype/public/lm/lmsans12-r
-egular.otf></usr/local/texlive/2026/texmf-dist/fonts/opentype/public/lm/lmroman1
+regular.otf></usr/local/texlive/2026/texmf-dist/fonts/opentype/public/lm/lmsans1
 0-regular.otf></usr/local/texlive/2026/texmf-dist/fonts/opentype/public/haranoaj
 i/HaranoAjiGothic-Medium.otf></usr/local/texlive/2026/texmf-dist/fonts/opentype/
 public/lm/lmroman17-regular.otf></usr/local/texlive/2026/texmf-dist/fonts/openty
 pe/public/haranoaji/HaranoAjiMincho-Regular.otf></usr/local/texlive/2026/texmf-d
-ist/fonts/type1/public/amsfonts/cm/cmex10.pfb></usr/local/texlive/2026/texmf-dis
-t/fonts/type1/public/amsfonts/cm/cmmi10.pfb></usr/local/texlive/2026/texmf-dist/
-fonts/type1/public/amsfonts/cm/cmmi5.pfb></usr/local/texlive/2026/texmf-dist/fon
-ts/type1/public/amsfonts/cm/cmmi7.pfb></usr/local/texlive/2026/texmf-dist/fonts/
-type1/public/amsfonts/cm/cmmib10.pfb></usr/local/texlive/2026/texmf-dist/fonts/t
-ype1/public/amsfonts/cmextra/cmmib7.pfb></usr/local/texlive/2026/texmf-dist/font
-s/type1/public/amsfonts/cm/cmr10.pfb></usr/local/texlive/2026/texmf-dist/fonts/t
-ype1/public/amsfonts/cm/cmr7.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1
-/public/amsfonts/cm/cmsy10.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/p
-ublic/amsfonts/cm/cmsy5.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/publ
-ic/amsfonts/cm/cmsy7.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/
-amsfonts/symbols/msbm10.pfb>
-Output written on research_map.pdf (8 pages, 296374 bytes).
+ist/fonts/type1/public/amsfonts/cm/cmbx10.pfb></usr/local/texlive/2026/texmf-dis
+t/fonts/type1/public/amsfonts/cm/cmex10.pfb></usr/local/texlive/2026/texmf-dist/
+fonts/type1/public/amsfonts/cm/cmmi10.pfb></usr/local/texlive/2026/texmf-dist/fo
+nts/type1/public/amsfonts/cm/cmmi5.pfb></usr/local/texlive/2026/texmf-dist/fonts
+/type1/public/amsfonts/cm/cmmi7.pfb></usr/local/texlive/2026/texmf-dist/fonts/ty
+pe1/public/amsfonts/cm/cmmib10.pfb></usr/local/texlive/2026/texmf-dist/fonts/typ
+e1/public/amsfonts/cmextra/cmmib7.pfb></usr/local/texlive/2026/texmf-dist/fonts/
+type1/public/amsfonts/cm/cmr10.pfb></usr/local/texlive/2026/texmf-dist/fonts/typ
+e1/public/amsfonts/cm/cmr7.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/p
+ublic/amsfonts/cm/cmsy10.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/pub
+lic/amsfonts/cm/cmsy5.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public
+/amsfonts/cm/cmsy7.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/am
+sfonts/symbols/msbm10.pfb>
+Output written on research_map.pdf (9 pages, 331045 bytes).
 
-PDF statistics: 230 PDF objects out of 1000 (max. 8388607)
- 173 compressed objects within 2 object streams
- 69 named destinations out of 1000 (max. 1048576)
- 1 words of extra memory for PDF output out of 10000 (max. 100000000)
+PDF statistics: 300 PDF objects out of 1000 (max. 8388607)
+ 240 compressed objects within 3 object streams
+ 73 named destinations out of 1000 (max. 1048576)
+ 113 words of extra memory for PDF output out of 10000 (max. 100000000)
 
